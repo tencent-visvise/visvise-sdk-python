@@ -1,0 +1,7 @@
+{
+  "config": {
+    "mesh_category": "humanoid",
+    "algo_name": "VISVISE-GoRigging-V1.0.0"
+  },
+  "selection": {}
+}
