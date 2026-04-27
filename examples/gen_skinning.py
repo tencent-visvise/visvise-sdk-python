@@ -98,7 +98,7 @@ JOINT_NAMES = [
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     print("[gen_skinning] 开始蒙皮生成...")
 

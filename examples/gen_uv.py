@@ -1,7 +1,5 @@
 """
 Example: gen_uv —— UV 展开（node_type=9）
-
-对模型进行自动 UV 展开。
 """
 
 import os
@@ -21,12 +19,12 @@ ASSETS = Path(__file__).parent / "assets"
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     print("[gen_uv] 开始 UV 展开...")
 
     model_id = client.gen_uv(
-        model_path=str(ASSETS / "high_model.fbx"),
+        model_path=str(ASSETS / "tex_model.obj"),
         algorithm_model="hunyuan3D-UV-v2.0",
         enable_auto_smoothing=True,
         name="example_gen_uv",

@@ -1,7 +1,7 @@
 """
 Example: gen_lod —— LOD 减面（node_type=2）
 
-生成多级细节模型，gen_times=3 表示生成 3 个版本供抽卡选择。
+gen_times=1 表示不抽卡，生成单个版本。
 """
 
 import os
@@ -22,12 +22,12 @@ ASSETS = Path(__file__).parent / "assets"
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     print("[gen_lod] 开始 LOD 减面...")
 
     model_ids = client.gen_lod(
-        model_path=str(ASSETS / "high_model.fbx"),
+        model_path=str(ASSETS / "tex_model.obj"),
         algorithm_model="VISVISE-LOD-V1.0.0",
         reduce_faces=[
             ReduceFace(reduce_level=1, reduce_percent=50, face_type=2),
@@ -35,7 +35,7 @@ def main():
             ReduceFace(reduce_level=3, reduce_percent=13, face_type=2),
         ],
         output_model_format="fbx",
-        gen_times=1,    # 改为 3 可开启抽卡
+        gen_times=1,
         name="example_gen_lod",
     )
     print(f"[gen_lod] 任务已创建，model_ids={model_ids}")

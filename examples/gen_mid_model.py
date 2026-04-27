@@ -1,7 +1,8 @@
 """
 Example: gen_mid_model —— 图生中模（node_type=3）
 
-使用四视图生成中精度 3D 模型（四视图均必传）。
+中模要求四视图全部必传。
+优先从环境变量 MV_360_MODEL_ID 读取 gen_360 的输出，自动提取四视图。
 """
 
 import os
@@ -20,16 +21,34 @@ ENV_MAP    = {"prod": Environment.PROD, "test": Environment.TEST, "dev": Environ
 ASSETS = Path(__file__).parent / "assets"
 
 
+def strip_sign(url: str) -> str:
+    return url.split("?")[0] if url else url
+
+
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
+
+    mv_model_id = os.environ.get("MV_360_MODEL_ID")
+    if mv_model_id:
+        print(f"[gen_mid_model] 从 gen_360 输出提取四视图 (model_id={mv_model_id})")
+        models, _ = client.api.get_model_list(model_id_list=[mv_model_id], limit=10)
+        out = models[0].image_gen_360_output.output_view
+        main_view  = strip_sign(out.main_view)
+        back_view  = strip_sign(out.back_view)
+        left_view  = strip_sign(out.left_view)
+        right_view = strip_sign(out.right_view)
+    else:
+        main_view  = os.environ.get("MV_MAIN",  str(ASSETS / "main_view.png"))
+        back_view  = os.environ.get("MV_BACK",  str(ASSETS / "back_view.png"))
+        left_view  = os.environ.get("MV_LEFT",  str(ASSETS / "left_view.png"))
+        right_view = os.environ.get("MV_RIGHT", str(ASSETS / "right_view.png"))
 
     print("[gen_mid_model] 开始生成中模...")
-
     model_id = client.gen_mid_model(
-        main_view=str(ASSETS / "main_view.png"),
-        back_view=str(ASSETS / "back_view.png"),
-        left_view=str(ASSETS / "left_view.png"),
-        right_view=str(ASSETS / "right_view.png"),
+        main_view=main_view,
+        back_view=back_view,
+        left_view=left_view,
+        right_view=right_view,
         algorithm_model="VISVISE-MeshGen-V1.0.0",
         output_model_format="fbx",
         face_type=1,

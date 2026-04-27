@@ -26,13 +26,13 @@ MAIN_VIEW = ASSETS / "main_view.png"
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     print(f"[gen_360] 开始生成多视图，输入图片：{MAIN_VIEW}")
 
     model_id = client.gen_360(
         main_view=str(MAIN_VIEW),
-        algorithm_model="hunyuan3D-MultiView-v3.0",
+        algorithm_model="VISVISE-MultiView-V1.0.0",
         name="example_gen_360",
     )
     print(f"[gen_360] 任务已创建，model_id={model_id}")

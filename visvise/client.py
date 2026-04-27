@@ -162,10 +162,11 @@ class VisviseClient:
         cos_client = CosS3Client(config)
 
         # ── 确定上传内容和文件名 ──
+        path_prefix = cred.path_prefix.rstrip("/") + "/"
         if isinstance(source, str):
             # 本地路径
             _filename = filename or os.path.basename(source)
-            cos_key = f"{cred.path_prefix}{_filename}"
+            cos_key = f"{path_prefix}{_filename}"
             logger.info("上传文件 %s → cos://%s/%s", source, cred.bucket, cos_key)
             with open(source, "rb") as f:
                 cos_client.put_object(Bucket=cred.bucket, Body=f, Key=cos_key)
@@ -173,7 +174,7 @@ class VisviseClient:
         elif isinstance(source, (bytes, bytearray)):
             # 二进制内容
             _filename = filename or f"upload_{uuid.uuid4().hex[:8]}.bin"
-            cos_key = f"{cred.path_prefix}{_filename}"
+            cos_key = f"{path_prefix}{_filename}"
             logger.info("上传 bytes (%d bytes) → cos://%s/%s", len(source), cred.bucket, cos_key)
             cos_client.put_object(Bucket=cred.bucket, Body=source, Key=cos_key)
 
@@ -182,7 +183,7 @@ class VisviseClient:
             data = source.read()
             _filename = filename or getattr(source, "name", None)
             _filename = os.path.basename(_filename) if _filename else f"upload_{uuid.uuid4().hex[:8]}.bin"
-            cos_key = f"{cred.path_prefix}{_filename}"
+            cos_key = f"{path_prefix}{_filename}"
             logger.info("上传文件对象 (%d bytes) → cos://%s/%s", len(data), cred.bucket, cos_key)
             cos_client.put_object(Bucket=cred.bucket, Body=data, Key=cos_key)
 
@@ -412,8 +413,10 @@ class VisviseClient:
         Raises:
             PollingTimeoutError: 超过 timeout 仍未完成。
             ModelGenerationError: 模型生成失败（status=4）。
-            注意：轮询接口本身的业务/网络错误不抛出异常，会打印日志并继续重试。
+            InvalidParamsError: 轮询接口返回参数错误时立即抛出（不重试）。
+            注意：其他业务/网络错误不抛出异常，会打印日志并继续重试。
         """
+        from .exceptions import InvalidParamsError  # 避免循环导入
         start = time.time()
 
         while True:
@@ -422,9 +425,12 @@ class VisviseClient:
                 raise PollingTimeoutError(model_id, timeout)
 
             try:
-                models, _ = self.api.get_model_list(model_id_list=[model_id], limit=1)
+                models, _ = self.api.get_model_list(model_id_list=[model_id], limit=10)
+            except InvalidParamsError:
+                # 参数错误无法靠重试恢复，直接抛出
+                raise
             except WeaverError as e:
-                # 轮询接口报错：打印警告，不抛出，继续等待
+                # 其他接口错误：打印警告，继续等待
                 logger.warning("轮询时接口错误（将继续重试）: %s", e)
                 time.sleep(interval)
                 continue
@@ -545,11 +551,11 @@ class VisviseClient:
         right_view: Optional[FileInput] = None,
         right_view_filename: Optional[str] = None,
     ) -> str:
-        """图生高模（node_type=11）。
+        """图生高模（node_type=3）。
 
         Args:
             main_view: 主视图，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
-            algorithm_model: 算法模型名称（如 ``hunyuan3D-v3.1``）。
+            algorithm_model: 算法模型名称（可通过 list_algorithm_model(node_type=3) 获取）。
             output_model_format: 输出格式 fbx/obj/glb，默认 fbx。
             face_type: 面数类型 1:三角面 2:四边面，默认 1。
             name: 任务名称。
@@ -599,13 +605,13 @@ class VisviseClient:
         left_view_filename: Optional[str] = None,
         right_view_filename: Optional[str] = None,
     ) -> str:
-        """图生中模（node_type=3）。
+        """图生中模（node_type=11）。
 
         注意：中模要求四视图全部必传。
 
         Args:
             main_view / back_view / left_view / right_view: 四视图，均支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
-            algorithm_model: 算法模型（如 ``VISVISE-MeshGen-V1.0.0``）。
+            algorithm_model: 算法模型（可通过 list_algorithm_model(node_type=11) 获取）。
             output_model_format: 输出格式，默认 fbx。
             face_type: 面数类型，默认 1。
             name: 任务名称。
@@ -880,12 +886,22 @@ class VisviseClient:
         if prompt is not None:
             tex_params["prompt"] = prompt
 
+        # 上传 input_view 中的本地路径（服务端不接受本地路径，必须是 COS URL）
+        resolved_view: Optional[View] = None
+        if input_view is not None:
+            resolved_view = View(
+                main_view=self._resolve_file(input_view.main_view) if input_view.main_view else input_view.main_view,
+                back_view=self._resolve_file(input_view.back_view) if input_view.back_view else None,
+                left_view=self._resolve_file(input_view.left_view) if input_view.left_view else None,
+                right_view=self._resolve_file(input_view.right_view) if input_view.right_view else None,
+            )
+
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.TEXTURE,
             params={"tex_params": tex_params},
             input_model=cos_url,
-            input_view=input_view,
+            input_view=resolved_view,
         )[0]
 
     # ── 4.2 骨骼架设 ─────────────────────────────────────────────────────

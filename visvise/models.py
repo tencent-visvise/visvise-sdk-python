@@ -18,7 +18,7 @@ class NodeType:
     """节点类型枚举 (node_type)"""
     RE_TOPOLOGY = 1       # 重拓扑
     LOD = 2               # LOD
-    IMG_TO_3D_MID = 3     # 图生3D（中模）
+    IMG_TO_3D_HIGH = 3    # 图生3D（高模）
     ANIMATION = 4         # Framing AI 动画生成
     RIGGING = 5           # 骨骼架设
     SKINNING = 6          # 蒙皮
@@ -26,7 +26,7 @@ class NodeType:
     TEXTURE = 8           # 贴图纹理
     UV = 9                # UV 展开
     MESH_REFINE = 10      # 布线优化
-    IMG_TO_3D_HIGH = 11   # 图生3D（高模）
+    IMG_TO_3D_MID = 11    # 图生3D（中模）
     IMG_TO_POSE = 12      # 图生 Pose
     IMG_TO_3D_LOW = 13    # 图生3D（低模）
 
@@ -202,6 +202,9 @@ class ModelInfo:
     failed_reason: Optional[FailedReason] = None
     lod_output: Optional[LODOutput] = None
     image_gen_360_output: Optional[ImageGen360Output] = None
+    params: Optional[dict] = None       # 原始生成参数（TemplateParams）
+    input_view: Optional[dict] = None   # 原始输入视图
+    algorithm_model: str = ""           # 使用的算法模型名
 
     @property
     def is_success(self) -> bool:
@@ -236,4 +239,7 @@ class ModelInfo:
             failed_reason=FailedReason.from_dict(fr) if fr else None,
             lod_output=LODOutput.from_dict(lod) if lod else None,
             image_gen_360_output=ImageGen360Output.from_dict(i360) if i360 else None,
+            params=d.get("params"),
+            input_view=d.get("input_view"),
+            algorithm_model=d.get("algorithm_model", ""),
         )

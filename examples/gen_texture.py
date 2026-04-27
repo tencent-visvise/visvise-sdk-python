@@ -1,9 +1,8 @@
 """
 Example: gen_texture —— 贴图纹理生成（node_type=8）
 
-为 3D 模型生成贴图纹理。
-input_view.main_view 和 prompt 必须传其中一个，可同时传入。
-本示例同时传入四视图和 prompt 以获得最佳效果。
+input_view 中的本地图片路径会被 SDK 自动上传到 COS。
+input_view.main_view 和 prompt 必须传其中一个。
 """
 
 import os
@@ -24,22 +23,19 @@ ASSETS = Path(__file__).parent / "assets"
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     print("[gen_texture] 开始贴图纹理生成...")
 
-    # 上传四视图，获取 COS URL（SDK 自动处理上传）
-    # 此处演示先用 gen_360 上传图片，再传入 COS URL；
-    # 也可直接传本地路径，SDK 会自动上传。
+    # 本地图片路径，SDK 内部自动上传到 COS
     input_view = View(
-        main_view=str(ASSETS / "main_view.png"),
-        back_view=str(ASSETS / "back_view.png"),
-        left_view=str(ASSETS / "left_view.png"),
-        right_view=str(ASSETS / "right_view.png"),
+        main_view=str(ASSETS / "tex_ref_front.jpg"),
+        back_view=str(ASSETS / "tex_ref_back.jpg"),
+        left_view=str(ASSETS / "tex_ref_left.jpg"),
     )
 
     model_id = client.gen_texture(
-        model_path=str(ASSETS / "high_model.fbx"),
+        model_path=str(ASSETS / "tex_model.obj"),
         algorithm_model="hunyuan3D-TEX-v2.0",
         input_view=input_view,
         resolution=2048,

@@ -57,9 +57,9 @@ client = VisviseClient(
     secret_key="your_secret_key",
 )
 
-# ① 图生360：生成多视图
+# ① 图生360：上传本地图片，生成多视图
 mv_model_id = client.gen_360(
-    main_view="https://cos.example.com/character.png",  # COS URL
+    main_view="character.png",          # 本地文件路径，SDK 自动上传
     algorithm_model="hunyuan3D-MultiView-v3.0",
     name="my_360",
 )
@@ -68,7 +68,7 @@ mv_model_id = client.gen_360(
 mv_info = client.wait_model(mv_model_id, interval=3, timeout=300)
 output_view = mv_info.image_gen_360_output.output_view
 
-# ③ 图生高模
+# ③ 图生高模（多视图输出的 COS URL 直接传入）
 high_model_id = client.gen_high_model(
     main_view=output_view.main_view,
     back_view=output_view.back_view,
@@ -376,7 +376,8 @@ print(model_info.time_cost)      # 耗时（秒）
 
 - `PollingTimeoutError`：超时仍未完成时抛出
 - `ModelGenerationError`：模型生成失败（status=4）时抛出
-- 轮询接口本身的网络/业务错误**不抛出**，会打印日志并继续重试
+- `InvalidParamsError`：轮询接口返回参数错误时立即抛出（不重试）
+- 其他网络/业务错误**不抛出**，会打印日志并继续重试
 
 ---
 

@@ -46,9 +46,11 @@ class VisviseAPI:
         Raises:
             WeaverError / 子类: 接口错误
         """
+        # is_temp=False 时不传该字段，避免签名不一致
+        body = {"is_temp": True} if is_temp else {}
         data = self._http.post(
             "openapi/weaver/resource/get_cos_cred",
-            {"is_temp": is_temp},
+            body,
         )
         return GetCosCredResult.from_dict(data)
 
@@ -287,7 +289,7 @@ class VisviseAPI:
             WeaverError / 子类: 接口错误
         """
         data = self._http.post(
-            "openapi/weaver/resource/remove_bg",
+            "openapi/weaver/resource/remove_background",
             {"image_url": image_url},
         )
         return data["image_url"]

@@ -67,9 +67,8 @@ class WeaverHTTPClient:
     # 签名
     # ──────────────────────────────────────────
 
-    def _sign(self, body: dict | None, ts: str) -> str:
-        """POST 签名：body_json + timestamp"""
-        body_str = json.dumps(body, ensure_ascii=False, separators=(",", ":")) if body else "{}"
+    def _sign(self, body_str: str, ts: str) -> str:
+        """POST 签名：body_json_str + timestamp"""
         sign_str = body_str + ts
         return hmac.new(
             self.secret_key.encode("utf-8"),
@@ -77,15 +76,16 @@ class WeaverHTTPClient:
             hashlib.sha256,
         ).hexdigest()
 
-    def _headers(self, body: dict | None = None) -> dict:
+    def _headers_with_body_str(self, body_str: str) -> dict:
         ts = str(int(time.time()))
-        sign = self._sign(body, ts)
-        return {
+        sign = self._sign(body_str, ts)
+        headers = {
             "Content-Type": "application/json",
             "app_id": self.app_id,
             "ts": ts,
             "sign": sign,
         }
+        return headers
 
     # ──────────────────────────────────────────
     # 请求
@@ -104,15 +104,18 @@ class WeaverHTTPClient:
         if body is None:
             body = {}
         url = f"{self.base_url}/{path.lstrip('/')}"
-        headers = self._headers(body)
 
-        logger.debug("POST %s body=%s", url, body)
+        # 序列化一次，签名和发送共用同一份字符串，确保一致
+        body_str = json.dumps(body, ensure_ascii=False, separators=(",", ":"))
+        headers = self._headers_with_body_str(body_str)
+
+        logger.debug("POST %s body=%s", url, body_str[:200])
 
         try:
             resp: Response = self._session.post(
                 url,
                 headers=headers,
-                json=body,
+                data=body_str.encode("utf-8"),  # 直接发序列化好的字符串
                 timeout=self.timeout,
             )
             resp.raise_for_status()
