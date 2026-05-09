@@ -143,10 +143,15 @@ class VisviseClient:
             ImportError: 未安装 cos-python-sdk-v5。
             WeaverError: 获取凭证失败。
         """
-        # ── 已是 URL（VISVISE 平台 COS URL），直接返回，不再上传 ──
-        # 注意：此处仅做格式判断，调用方需确保传入的 URL 来自 VISVISE 平台
+        # ── 已是 VISVISE 平台 COS URL，直接返回，不再上传 ──
         if isinstance(source, str) and not os.path.isfile(source):
-            return source
+            if source.startswith("https://") and ".myqcloud.com" in source and ".cos." in source:
+                return source
+            raise FileNotFoundError(
+                f"本地文件不存在: {source!r}。"
+                f"如果要传入已上传的 COS URL，请确保是 VISVISE 平台 COS 地址"
+                f"（格式：https://{{bucket}}.cos.{{region}}.myqcloud.com/...）。"
+            )
 
         try:
             from qcloud_cos import CosConfig, CosS3Client  # type: ignore
@@ -342,9 +347,15 @@ class VisviseClient:
         Returns:
             上传后的 VISVISE 平台 COS URL，或原始 URL 字符串。
         """
-        # ── 已是 URL，直接返回 ──
+        # ── 已是 VISVISE 平台 COS URL，直接返回 ──
         if isinstance(source, str) and not os.path.isfile(source):
-            return source
+            if source.startswith("https://") and ".myqcloud.com" in source and ".cos." in source:
+                return source
+            raise FileNotFoundError(
+                f"本地文件不存在: {source!r}。"
+                f"如果要传入已上传的 COS URL，请确保是 VISVISE 平台 COS 地址"
+                f"（格式：https://{{bucket}}.cos.{{region}}.myqcloud.com/...）。"
+            )
 
         # ── 本地路径处理 ──
         if isinstance(source, str):
