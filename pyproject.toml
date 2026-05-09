@@ -26,3 +26,4 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["visvise*"]
+exclude = ["examples*", "tests*", "assets*"]
