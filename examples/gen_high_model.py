@@ -15,6 +15,7 @@ from visvise import Environment, VisviseClient
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
+UID        = os.environ["VISVISE_UID"]
 ENV        = os.environ.get("VISVISE_ENV", "prod")
 ENV_MAP    = {"prod": Environment.PROD, "test": Environment.TEST, "dev": Environment.DEV}
 
@@ -26,7 +27,7 @@ def strip_sign(url: str) -> str:
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
+    client = VisviseClient(APP_ID, SECRET_KEY, UID, env=ENV_MAP[ENV])  # noqa
 
     mv_model_id = os.environ.get("MV_360_MODEL_ID")
     if mv_model_id:

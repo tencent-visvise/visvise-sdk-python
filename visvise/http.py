@@ -52,12 +52,14 @@ class WeaverHTTPClient:
         self,
         app_id: str,
         secret_key: str,
+        uid: str,
         base_url: str | Environment = Environment.PROD,
         timeout: int = 30,
     ):
         # 兼容 Environment 枚举和自定义字符串
         self.app_id = app_id
         self.secret_key = secret_key
+        self.uid = uid
         self.base_url = (base_url.value if isinstance(base_url, Environment) else base_url).rstrip("/")
         self.timeout = timeout
         self._session = requests.Session()
@@ -82,6 +84,7 @@ class WeaverHTTPClient:
         headers = {
             "Content-Type": "application/json",
             "app_id": self.app_id,
+            "uid": self.uid,
             "ts": ts,
             "sign": sign,
         }

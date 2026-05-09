@@ -60,16 +60,16 @@ class VisviseClient:
         from visvise import VisviseClient, Environment
 
         # 线上生产环境（默认）
-        client = VisviseClient(app_id="your_app_id", secret_key="your_key")
+        client = VisviseClient(app_id="your_app_id", secret_key="your_key", uid="your_uid")
 
         # 测试环境
-        client = VisviseClient("app_id", "key", env=Environment.TEST)
+        client = VisviseClient("app_id", "key", "uid", env=Environment.TEST)
 
         # 开发环境
-        client = VisviseClient("app_id", "key", env=Environment.DEV)
+        client = VisviseClient("app_id", "key", "uid", env=Environment.DEV)
 
         # 自定义域名（如代理）
-        client = VisviseClient("app_id", "key", env="https://my-proxy.example.com")
+        client = VisviseClient("app_id", "key", "uid", env="https://my-proxy.example.com")
 
         # 高阶方法：自动上传文件 + 创建任务，返回 model_id
         model_id = client.gen_360(
@@ -84,6 +84,7 @@ class VisviseClient:
     Args:
         app_id: 由平台分配的客户端标识。
         secret_key: 由平台分配的签名密钥。
+        uid: 用户 ID，从申请 key 的登录账号获取。当前一期未做严格校验，但必须传入；二期将做严格校验。
         env: 环境配置，支持 :class:`~visvise.http.Environment` 枚举或自定义 URL 字符串。
              默认 :attr:`~visvise.http.Environment.PROD`（线上生产环境）。
         timeout: 单次 HTTP 请求超时（秒），默认 30。
@@ -93,12 +94,14 @@ class VisviseClient:
         self,
         app_id: str,
         secret_key: str,
+        uid: str,
         env: str | Environment = Environment.PROD,
         timeout: int = 30,
     ):
         self._http = WeaverHTTPClient(
             app_id=app_id,
             secret_key=secret_key,
+            uid=uid,
             base_url=env,
             timeout=timeout,
         )

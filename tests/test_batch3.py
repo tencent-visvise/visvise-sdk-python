@@ -5,8 +5,9 @@ from visvise import VisviseClient
 
 APP_ID = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
+UID        = os.environ["VISVISE_UID"]
 ASSETS = Path(__file__).parent / "assets"
-client = VisviseClient(APP_ID, SECRET_KEY)
+client = VisviseClient(APP_ID, SECRET_KEY, UID)
 
 results = []
 def check(name, mid, expected):

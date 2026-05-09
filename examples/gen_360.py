@@ -16,6 +16,7 @@ from visvise import Environment, VisviseClient
 # ── 从环境变量读取鉴权信息 ──────────────────────────────────────────────
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
+UID        = os.environ["VISVISE_UID"]
 ENV        = os.environ.get("VISVISE_ENV", "prod")
 
 ENV_MAP = {"prod": Environment.PROD, "test": Environment.TEST, "dev": Environment.DEV}
@@ -26,7 +27,7 @@ MAIN_VIEW = ASSETS / "main_view.png"
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
+    client = VisviseClient(APP_ID, SECRET_KEY, UID, env=ENV_MAP[ENV])  # noqa
 
     print(f"[gen_360] 开始生成多视图，输入图片：{MAIN_VIEW}")
 

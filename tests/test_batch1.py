@@ -6,8 +6,9 @@ from visvise.models import View, ReduceFace
 
 APP_ID = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
+UID        = os.environ["VISVISE_UID"]
 ASSETS = Path(__file__).parent / "assets"
-client = VisviseClient(APP_ID, SECRET_KEY)
+client = VisviseClient(APP_ID, SECRET_KEY, UID)
 
 MV_BASE = "https://visvise-weaver-bj-rel-1311802504.cos.accelerate.myqcloud.com/weaver/user-p_5sxfmuvwtfj58ssbt97q2k2kc83697p/Model2026042300225069"
 MV = {k: f"{MV_BASE}/example_gen_360_MultiView(2)_{v}.png"
