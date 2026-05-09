@@ -349,3 +349,57 @@ class VisviseAPI:
             {"language": language},
         )
         return data.get("prompt_list", [])
+
+    # ──────────────────────────────────────────────────────────────────────
+    # 2.14 初始化分割（SSE）
+    # ──────────────────────────────────────────────────────────────────────
+
+    def init_segment(
+        self,
+        name: str,
+        algorithm_model: str,
+        *,
+        model_id: Optional[str] = None,
+        input_view: Optional[View] = None,
+        split_type: Optional[int] = None,
+        granularity: Optional[int] = None,
+        prompt: Optional[str] = None,
+    ):
+        """初始化 2D 分割（SSE 流式接口）。
+
+        ``model_id`` 与 ``input_view`` 二选一。返回 generator，每次 yield 一个事件帧
+        ``{"event": str, "data": Any}``，事件类型包括 ``pre_create`` / ``thinking``
+        / ``reply`` / ``error``。
+
+        Args:
+            name: 资产名称（最长 100 字符）。
+            algorithm_model: 算法模型名称。
+            model_id: 图生 360 的 model_id。
+            input_view: 输入视图。
+            split_type: 拆分方式，1 正视图（默认）/ 2 四视图。
+            granularity: 颗粒度，1 粗 / 2 中（默认）/ 3 细。
+            prompt: 拆分提示词（最长 200 字符）。
+
+        Yields:
+            事件帧字典 ``{"event": str, "data": Any}``。
+
+        Raises:
+            ValueError: ``model_id`` 与 ``input_view`` 都未传时抛出。
+            NetworkError: SSE 网络层异常。
+        """
+        if not model_id and not input_view:
+            raise ValueError("init_segment 需要传入 model_id 或 input_view 其中一个")
+
+        body: dict = {"name": name, "algorithm_model": algorithm_model}
+        if model_id:
+            body["model_id"] = model_id
+        if input_view is not None:
+            body["input_view"] = input_view.to_dict()
+        if split_type is not None:
+            body["split_type"] = split_type
+        if granularity is not None:
+            body["granularity"] = granularity
+        if prompt is not None:
+            body["prompt"] = prompt
+
+        return self._http.post_sse("openapi/weaver/component/init_segment", body)

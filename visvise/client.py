@@ -15,7 +15,7 @@ import os
 import time
 import uuid
 import zipfile
-from typing import IO, Optional, Union
+from typing import IO, Callable, Optional, Union
 
 from .api import VisviseAPI
 from .exceptions import ModelGenerationError, PollingTimeoutError, WeaverError
@@ -1246,4 +1246,96 @@ class VisviseClient:
                 "output_model_format": output_model_format,
             },
         )
+
+    # ── 4.1 2D 拆分 ─────────────────────────────────────────────────────
+
+    def gen_segment_2d(
+        self,
+        model_id_360: Optional[str] = None,
+        algorithm_model: Optional[str] = None,
+        name: str = "gen_segment_2d",
+        *,
+        input_view: Optional[View] = None,
+        split_type: Optional[int] = None,
+        granularity: Optional[int] = None,
+        prompt: Optional[str] = None,
+        on_thinking: Optional[Callable[[str], None]] = None,
+    ) -> str:
+        """2D 拆分（node_type=14，SSE 流式接口）。
+
+        对图生 360 的多视图进行组件分割，返回的分割资产 ``model_id`` 可作为图生中模 /
+        图生低模的 ``segment_model_id`` 输入。
+
+        Args:
+            model_id_360: 图生 360 的 model_id（与 ``input_view`` 二选一）。
+            algorithm_model: 算法模型，可选。不传则自动选首个可用模型。
+            name: 资产名称。
+            input_view: 输入视图（与 ``model_id_360`` 二选一）。
+            split_type: 拆分方式：1 正视图（默认）/ 2 四视图。
+            granularity: 颗粒度：1 粗 / 2 中（默认）/ 3 细。
+            prompt: 拆分提示词。
+            on_thinking: 可选回调，``thinking`` 事件触发时调用，参数为思考内容字符串。
+
+        Returns:
+            分割资产的 model_id（从 ``pre_create`` 事件中提取），生成完成后可用于
+            后续图生模任务的 ``segment_model_id``。
+
+        Raises:
+            ValueError: ``model_id_360`` 与 ``input_view`` 都未传时抛出。
+            ModelGenerationError: SSE 流返回 error 事件时抛出。
+        """
+        if not model_id_360 and not input_view:
+            raise ValueError("gen_segment_2d 需要传入 model_id_360 或 input_view 其中一个")
+
+        # 如果传了 input_view，先解析其中的本地路径
+        resolved_view: Optional[View] = None
+        if input_view is not None:
+            resolved_view = View(
+                main_view=self._resolve_file(input_view.main_view) if input_view.main_view else input_view.main_view,
+                back_view=self._resolve_file(input_view.back_view) if input_view.back_view else None,
+                left_view=self._resolve_file(input_view.left_view) if input_view.left_view else None,
+                right_view=self._resolve_file(input_view.right_view) if input_view.right_view else None,
+            )
+
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.SEGMENT_2D)
+
+        new_model_id: Optional[str] = None
+        for frame in self.api.init_segment(
+            name=name,
+            algorithm_model=resolved_model,
+            model_id=model_id_360,
+            input_view=resolved_view,
+            split_type=split_type,
+            granularity=granularity,
+            prompt=prompt,
+        ):
+            event = frame.get("event")
+            data = frame.get("data")
+            if event == "pre_create":
+                if isinstance(data, dict):
+                    new_model_id = data.get("model_id")
+                logger.info("gen_segment_2d: pre_create model_id=%s", new_model_id)
+            elif event == "thinking":
+                if on_thinking and isinstance(data, str):
+                    on_thinking(data)
+                else:
+                    logger.debug("gen_segment_2d thinking: %s", data)
+            elif event == "reply":
+                logger.info("gen_segment_2d: reply 接收完成")
+                break
+            elif event == "error":
+                msg = data.get("msg") if isinstance(data, dict) else str(data)
+                raise ModelGenerationError(
+                    f"2D 分割失败: {msg}",
+                    code=(data.get("code") if isinstance(data, dict) else -1),
+                    model_id=new_model_id or "",
+                )
+
+        if not new_model_id:
+            raise ModelGenerationError(
+                "2D 分割未返回 model_id",
+                code=-1,
+                model_id="",
+            )
+        return new_model_id
 

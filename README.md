@@ -31,6 +31,7 @@ VISVISE Weaver OpenAPI 的 Python SDK，提供：
   - [gen_video_motion — 视频生动画](#gen_video_motion--视频生动画)
   - [gen_text_motion — 文本生动画](#gen_text_motion--文本生动画)
   - [gen_pose — 图生Pose](#gen_pose--图生pose)
+  - [gen_segment_2d — 2D 拆分](#gen_segment_2d--2d-拆分)
   - [wait_model — 等待完成](#wait_model--等待完成)
 - [原子 API 方法参考](#原子-api-方法参考)
 - [异常说明](#异常说明)
@@ -124,7 +125,7 @@ client = VisviseClient(
 SDK 提供以下枚举常量，推荐使用枚举替代硬编码数字/字符串：
 
 ```python
-from visvise import FaceType, DetailLevel, OutputModelFormat, MeshRefineMode
+from visvise import FaceType, DetailLevel, OutputModelFormat, MeshRefineMode, SegmentSplitType, SegmentGranularity
 
 # 面数类型
 FaceType.TRIANGLE  # 1 - 三角面
@@ -143,6 +144,15 @@ OutputModelFormat.GLB  # "glb"
 # 布线优化模式
 MeshRefineMode.OPTIMIZE  # 1 - 布线优化
 MeshRefineMode.DENSIFY   # 2 - 布线加密
+
+# 2D 拆分方式
+SegmentSplitType.FRONT_VIEW  # 1 - 生成正视图拆分（默认）
+SegmentSplitType.FOUR_VIEW   # 2 - 生成四视图拆分
+
+# 2D 拆分颗粒度
+SegmentGranularity.COARSE   # 1 - 粗
+SegmentGranularity.MEDIUM   # 2 - 中（默认）
+SegmentGranularity.FINE     # 3 - 细
 ```
 
 ---
@@ -159,6 +169,7 @@ MeshRefineMode.DENSIFY   # 2 - 布线加密
 from visvise import (
     VisviseClient, Environment,
     FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
+    SegmentSplitType, SegmentGranularity,
     ReduceFace, View,
 )
 
@@ -448,6 +459,30 @@ model_ids = client.gen_pose(
     model_filename=None,                           # 可选，model_path 为 bytes/BinaryIO 时指定文件名
     image_filenames=None,                          # 可选，与 input_images 一一对应的文件名列表
 )
+```
+
+---
+
+### gen_segment_2d — 2D 拆分
+
+对图生 360 输出的多视图进行组件分割（node_type=14，SSE 协议）。生成的分割资产 `model_id` 可作为图生中模/低模的 `segment_model_id` 输入。 → [示例代码](examples/gen_segment_2d.py)
+
+```python
+def on_thinking(content: str):
+    print("[思考]", content)
+
+seg_model_id = client.gen_segment_2d(
+    model_id_360="Model202604xxxxxx",             # 必填（与 input_view 二选一），图生 360 的 model_id
+    algorithm_model=None,                          # 可选，如 "VISVISE-Seg2D-V1.0.0"
+    name="gen_segment_2d",                         # 可选，任务名称
+    input_view=None,                               # 可选（与 model_id_360 二选一），输入视图
+    split_type=None,                               # 可选，SegmentSplitType.FRONT_VIEW(1, 默认) / FOUR_VIEW(2)
+    granularity=None,                              # 可选，SegmentGranularity.COARSE(1) / MEDIUM(2, 默认) / FINE(3)
+    prompt=None,                                   # 可选，自然语言描述拆分规则（最长 200 字符）
+    on_thinking=on_thinking,                       # 可选，处理 thinking 事件的回调
+)
+# 后续可作为 segment_model_id 传给 gen_mid_model / gen_low_model
+mid_id = client.gen_mid_model(..., segment_model_id=seg_model_id)
 ```
 
 ---

@@ -29,6 +29,7 @@ class NodeType:
     IMG_TO_3D_MID = 11    # 图生3D（中模）
     IMG_TO_POSE = 12      # 图生 Pose
     IMG_TO_3D_LOW = 13    # 图生3D（低模）
+    SEGMENT_2D = 14       # 2D 拆分
 
 
 class ModelStatus:
@@ -64,6 +65,19 @@ class MeshRefineMode:
     """布线优化模式枚举 (mode)"""
     OPTIMIZE = 1    # 布线优化
     DENSIFY = 2     # 布线加密
+
+
+class SegmentSplitType:
+    """2D 拆分方式枚举 (split_type)"""
+    FRONT_VIEW = 1  # 生成正视图拆分（默认）
+    FOUR_VIEW = 2   # 生成四视图拆分
+
+
+class SegmentGranularity:
+    """2D 拆分颗粒度枚举 (granularity)"""
+    COARSE = 1      # 粗（×50%）
+    MEDIUM = 2      # 中（×70%，默认）
+    FINE = 3        # 细（×100%）
 
 
 # ──────────────────────────────────────────────
