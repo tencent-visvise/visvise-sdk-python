@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from visvise import Environment, VisviseClient
+from visvise import Environment, VisviseClient, OutputModelFormat
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
@@ -31,7 +31,7 @@ def main():
         model_path=str(ASSETS / "animation_model.fbx"),
         prompt="一个人在跳街舞",
         algorithm_model="VISVISE-TextMotion-V1.1.0",
-        output_model_format="fbx",
+        output_model_format=OutputModelFormat.FBX,
         name="example_gen_text_motion",
     )
     print(f"[gen_text_motion] 任务已创建，共 {len(model_ids)} 个版本：{model_ids}")

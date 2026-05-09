@@ -40,6 +40,32 @@ class ModelStatus:
     FAILED = 4      # 生成失败
 
 
+class FaceType:
+    """面数类型枚举 (face_type)"""
+    TRIANGLE = 1    # 三角面
+    QUAD = 2        # 四边面
+
+
+class DetailLevel:
+    """精细程度枚举 (detail_level)，用于重拓扑"""
+    LOW = 1         # 低
+    MEDIUM = 2      # 中
+    HIGH = 3        # 高
+
+
+class OutputModelFormat:
+    """输出模型格式枚举 (output_model_format)"""
+    FBX = "fbx"
+    OBJ = "obj"
+    GLB = "glb"
+
+
+class MeshRefineMode:
+    """布线优化模式枚举 (mode)"""
+    OPTIMIZE = 1    # 布线优化
+    DENSIFY = 2     # 布线加密
+
+
 # ──────────────────────────────────────────────
 # 公共请求结构
 # ──────────────────────────────────────────────

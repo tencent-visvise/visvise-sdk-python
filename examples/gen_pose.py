@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from visvise import Environment, VisviseClient
+from visvise import Environment, VisviseClient, OutputModelFormat
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
@@ -32,7 +32,7 @@ def main():
             str(ASSETS / "pose_ref.png"),
         ],
         algorithm_model="VISVISE-PosingAI-V1.0.0",
-        output_model_format="fbx",
+        output_model_format=OutputModelFormat.FBX,
         name="example_gen_pose",
     )
     print(f"[gen_pose] 任务已创建，model_ids={model_ids}")

@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from visvise import Environment, VisviseClient
+from visvise import Environment, VisviseClient, OutputModelFormat
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
@@ -30,7 +30,7 @@ def main():
         model_path=str(ASSETS / "animation_model.fbx"),
         video_path=str(ASSETS / "animation_video.mp4"),
         algorithm_model="VISVISE-FramingAI-Base-V1.5.0",
-        output_model_format="fbx",
+        output_model_format=OutputModelFormat.FBX,
         with_hand=True,
         name="example_gen_video_motion",
     )

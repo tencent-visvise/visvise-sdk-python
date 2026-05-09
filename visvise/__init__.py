@@ -24,12 +24,16 @@ from .exceptions import (
     WeaverError,
 )
 from .models import (
+    DetailLevel,
+    FaceType,
     FramingAIOutput,
     GetCosCredResult,
     ImageGen360Output,
+    MeshRefineMode,
     ModelInfo,
     ModelStatus,
     NodeType,
+    OutputModelFormat,
     ReduceFace,
     Text2Motion,
     UserQuota,
@@ -50,13 +54,19 @@ __all__ = [
     "RateLimitError",
     "ModelGenerationError",
     "PollingTimeoutError",
-    # models
-    "VisviseClient",
+    # models & enums
     "ModelInfo",
     "ModelStatus",
     "NodeType",
+    "FaceType",
+    "DetailLevel",
+    "OutputModelFormat",
+    "MeshRefineMode",
     "View",
     "ReduceFace",
     "UserQuota",
     "GetCosCredResult",
+    "ImageGen360Output",
+    "FramingAIOutput",
+    "Text2Motion",
 ]

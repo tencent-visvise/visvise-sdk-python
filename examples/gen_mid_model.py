@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from visvise import Environment, VisviseClient
+from visvise import Environment, VisviseClient, FaceType, OutputModelFormat
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
@@ -51,8 +51,8 @@ def main():
         left_view=left_view,
         right_view=right_view,
         algorithm_model="VISVISE-MeshGen-V1.0.0",
-        output_model_format="fbx",
-        face_type=1,
+        output_model_format=OutputModelFormat.FBX,
+        face_type=FaceType.TRIANGLE,
         name="example_gen_mid_model",
     )
     print(f"[gen_mid_model] 任务已创建，model_id={model_id}")

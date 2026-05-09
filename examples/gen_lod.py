@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from visvise import Environment, VisviseClient
+from visvise import Environment, VisviseClient, FaceType, OutputModelFormat
 from visvise.models import ReduceFace
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
@@ -31,11 +31,11 @@ def main():
         model_path=str(ASSETS / "tex_model.obj"),
         algorithm_model="VISVISE-LOD-V1.0.0",
         reduce_faces=[
-            ReduceFace(reduce_level=1, reduce_percent=50, face_type=2),
-            ReduceFace(reduce_level=2, reduce_percent=25, face_type=2),
-            ReduceFace(reduce_level=3, reduce_percent=13, face_type=2),
+            ReduceFace(reduce_level=1, reduce_percent=50, face_type=FaceType.QUAD),
+            ReduceFace(reduce_level=2, reduce_percent=25, face_type=FaceType.QUAD),
+            ReduceFace(reduce_level=3, reduce_percent=13, face_type=FaceType.QUAD),
         ],
-        output_model_format="fbx",
+        output_model_format=OutputModelFormat.FBX,
         gen_times=1,
         name="example_gen_lod",
     )

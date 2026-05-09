@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from visvise import Environment, VisviseClient
+from visvise import Environment, VisviseClient, FaceType, OutputModelFormat
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
@@ -29,8 +29,8 @@ def main():
     model_id = client.gen_low_model(
         main_view=str(ASSETS / "main_view.png"),
         algorithm_model="Tripo-v1.0-快速生成",
-        output_model_format="fbx",
-        face_type=1,
+        output_model_format=OutputModelFormat.FBX,
+        face_type=FaceType.TRIANGLE,
         name="example_gen_low_model",
     )
     print(f"[gen_low_model] 任务已创建，model_id={model_id}")
