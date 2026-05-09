@@ -24,11 +24,14 @@ from .exceptions import (
     WeaverError,
 )
 from .models import (
+    FramingAIOutput,
     GetCosCredResult,
+    ImageGen360Output,
     ModelInfo,
     ModelStatus,
     NodeType,
     ReduceFace,
+    Text2Motion,
     UserQuota,
     View,
 )

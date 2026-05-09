@@ -648,6 +648,7 @@ class VisviseClient:
         back_view_filename: Optional[str] = None,
         left_view_filename: Optional[str] = None,
         right_view_filename: Optional[str] = None,
+        segment_model_id: Optional[str] = None,
     ) -> str:
         """图生中模（node_type=11）。
 
@@ -661,6 +662,7 @@ class VisviseClient:
             face_type: 面数类型，默认 1。
             name: 任务名称。
             *_filename: bytes/BinaryIO 输入时对应的文件名。
+            segment_model_id: 2D 分割资产 ID，传入后将基于分割结果生成模型。
 
         Returns:
             新生成的模型 ID。
@@ -672,14 +674,17 @@ class VisviseClient:
             right_view=self._resolve_file(right_view, filename=right_view_filename),
         )
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_MID)
+        img_params: dict = {
+            "algorithm_model": resolved_model,
+            "output_model_format": output_model_format,
+            "face_type": face_type,
+        }
+        if segment_model_id is not None:
+            img_params["segment_model_id"] = segment_model_id
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.IMG_TO_3D_MID,
-            params={"image_gen_model_params": {
-                "algorithm_model": resolved_model,
-                "output_model_format": output_model_format,
-                "face_type": face_type,
-            }},
+            params={"image_gen_model_params": img_params},
             input_view=view,
         )[0]
 
@@ -716,14 +721,15 @@ class VisviseClient:
             right_view=self._resolve_file(right_view, filename=right_view_filename) if right_view is not None else None,
         )
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_LOW)
+        img_params: dict = {
+            "algorithm_model": resolved_model,
+            "output_model_format": output_model_format,
+            "face_type": face_type,
+        }
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.IMG_TO_3D_LOW,
-            params={"image_gen_model_params": {
-                "algorithm_model": resolved_model,
-                "output_model_format": output_model_format,
-                "face_type": face_type,
-            }},
+            params={"image_gen_model_params": img_params},
             input_view=view,
         )[0]
 
@@ -737,7 +743,9 @@ class VisviseClient:
         name: str = "gen_mesh_refine",
         *,
         filename: Optional[str] = None,
-        enable_detail_preserve: Optional[bool] = None,
+        mode: Optional[int] = None,
+        color_model: Optional[FileInput] = None,
+        color_model_filename: Optional[str] = None,
     ) -> str:
         """重布线/布线优化（node_type=10）。
 
@@ -748,7 +756,10 @@ class VisviseClient:
             input_model_format: 输入模型格式，默认 fbx。
             name: 任务名称。
             filename: bytes/BinaryIO 时指定文件名（建议带 .zip 后缀）。
-            enable_detail_preserve: 是否细节保留。
+            mode: 模式：1 布线优化（默认），2 布线加密。
+            color_model: 带颜色的模型，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                传入后将为输出模型附加颜色信息。
+            color_model_filename: color_model 为 bytes/BinaryIO 时指定文件名。
         """
         cos_url = self._resolve_model_file(model_path, filename=filename)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.MESH_REFINE)
@@ -756,8 +767,10 @@ class VisviseClient:
             "algorithm_model": resolved_model,
             "input_model_format": input_model_format,
         }
-        if enable_detail_preserve is not None:
-            params["enable_detail_preserve"] = enable_detail_preserve
+        if mode is not None:
+            params["mode"] = mode
+        if color_model is not None:
+            params["color_model"] = self._resolve_model_file(color_model, filename=color_model_filename)
 
         return self.api.gen_3d_model(
             name=name,

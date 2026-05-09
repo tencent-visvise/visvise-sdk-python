@@ -185,6 +185,34 @@ class ImageGen360Output:
 
 
 @dataclass
+class Text2Motion:
+    """文生动画单条输出"""
+    output_model: str = ""
+    preview_img: str = ""
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Text2Motion":
+        return cls(
+            output_model=d.get("output_model", ""),
+            preview_img=d.get("preview_img", ""),
+        )
+
+
+@dataclass
+class FramingAIOutput:
+    """Framing AI 的输出结果"""
+    text2_motion_result: list[Text2Motion] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "FramingAIOutput":
+        return cls(
+            text2_motion_result=[
+                Text2Motion.from_dict(m) for m in d.get("text2_motion_result", [])
+            ],
+        )
+
+
+@dataclass
 class ModelInfo:
     """模型资产信息（拉取模型资产列表响应）"""
     model_id: str
@@ -199,9 +227,11 @@ class ModelInfo:
     input_video: str = ""
     time_cost: int = 0
     remaining_time: int = 0
+    wait_time: int = 0
     failed_reason: Optional[FailedReason] = None
     lod_output: Optional[LODOutput] = None
     image_gen_360_output: Optional[ImageGen360Output] = None
+    framing_ai_output: Optional[FramingAIOutput] = None
     params: Optional[dict] = None       # 原始生成参数（TemplateParams）
     input_view: Optional[dict] = None   # 原始输入视图
     algorithm_model: str = ""           # 使用的算法模型名
@@ -223,6 +253,7 @@ class ModelInfo:
         fr = d.get("failed_reason")
         lod = d.get("lod_output")
         i360 = d.get("image_gen_360_output")
+        fai = d.get("framing_ai_output")
         return cls(
             model_id=d.get("model_id", ""),
             name=d.get("name", ""),
@@ -236,9 +267,11 @@ class ModelInfo:
             input_video=d.get("input_video", ""),
             time_cost=d.get("time_cost", 0),
             remaining_time=d.get("remaining_time", 0),
+            wait_time=d.get("wait_time", 0),
             failed_reason=FailedReason.from_dict(fr) if fr else None,
             lod_output=LODOutput.from_dict(lod) if lod else None,
             image_gen_360_output=ImageGen360Output.from_dict(i360) if i360 else None,
+            framing_ai_output=FramingAIOutput.from_dict(fai) if fai else None,
             params=d.get("params"),
             input_view=d.get("input_view"),
             algorithm_model=d.get("algorithm_model", ""),
