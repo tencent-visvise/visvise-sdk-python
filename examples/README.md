@@ -1,11 +1,13 @@
 # VISVISE Weaver SDK - Examples
 
+**[English](README_EN.md)** | 中文
+
 每个文件对应一个 `gen_xxx` 方法的完整调用示例，同时可用作集成测试。
 
 ## 前置条件
 
 ```bash
-pip install visvise-weaver-sdk "visvise-weaver-sdk[upload]"
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git
 ```
 
 设置环境变量：
@@ -13,6 +15,7 @@ pip install visvise-weaver-sdk "visvise-weaver-sdk[upload]"
 ```bash
 export VISVISE_APP_ID="your_app_id"
 export VISVISE_SECRET_KEY="your_secret_key"
+export VISVISE_UID="your_uid"
 # 可选，默认线上生产环境
 export VISVISE_ENV="prod"   # prod / test / dev
 ```

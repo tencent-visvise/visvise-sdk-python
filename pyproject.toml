@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "visvise-weaver-sdk"
@@ -13,12 +13,10 @@ keywords = ["visvise", "3d", "ai", "weaver"]
 
 dependencies = [
     "requests>=2.28",
+    "cos-python-sdk-v5>=1.9",
 ]
 
 [project.optional-dependencies]
-upload = [
-    "cos-python-sdk-v5>=1.9",
-]
 dev = [
     "pytest>=7",
     "pytest-mock",
