@@ -7,7 +7,7 @@
 ## 前置条件
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.0
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.1
 ```
 
 设置环境变量：

@@ -7,7 +7,7 @@ Each file corresponds to a complete usage example for a `gen_xxx` method, and ca
 ## Prerequisites
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.0
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.1
 ```
 
 Set environment variables:

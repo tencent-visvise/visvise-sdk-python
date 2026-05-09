@@ -43,13 +43,13 @@ VISVISE Weaver OpenAPI 的 Python SDK，提供：
 直接从 GitHub 仓库安装（包含 COS 上传依赖）：
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.0
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.1
 ```
 
 或通过 SSH：
 
 ```bash
-pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.0.0
+pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.0.1
 ```
 
 > **注：** 安装后即包含腾讯云 COS SDK，可直接使用本地文件自动上传功能，无需额外安装。
@@ -171,11 +171,18 @@ client = VisviseClient(app_id="...", secret_key="...", uid="...")
 
 ```python
 model_id = client.gen_360(
-    main_view="path/to/character.png",
-    algorithm_model="hunyuan3D-MultiView-v3.0",  # 可选
-    name="gen_360",
-    enable_a_pose=False,
-    style=None,
+    main_view="path/to/character.png",   # 必填，主视图（本地路径或 VISVISE 平台 COS URL）
+    algorithm_model=None,                # 可选，算法模型名（如 "hunyuan3D-MultiView-v3.0"）；不传则自动选首个可用模型
+    name="gen_360",                      # 可选，任务名称
+    enable_a_pose=None,                  # 可选，是否开启 A-Pose（True/False）
+    style=None,                          # 可选，风格类型（仅 VISVISE 自研模型支持）：灰模/超写实/Q版卡通/像素风格
+    main_view_filename=None,             # 可选，main_view 为 bytes/BinaryIO 时指定文件名
+    back_view=None,                      # 可选，背视图，提升生成质量
+    back_view_filename=None,             # 可选，back_view 文件名
+    left_view=None,                      # 可选，左视图
+    left_view_filename=None,             # 可选，left_view 文件名
+    right_view=None,                     # 可选，右视图
+    right_view_filename=None,            # 可选，right_view 文件名
 )
 ```
 
@@ -183,18 +190,23 @@ model_id = client.gen_360(
 
 ### gen_high_model — 图生高模
 
-从多视图生成高精度 3D 模型（node_type=3）。 → [示例代码](examples/gen_high_model.py)
+从图片/多视图生成高精度 3D 模型（node_type=3）。 → [示例代码](examples/gen_high_model.py)
 
 ```python
 model_id = client.gen_high_model(
-    main_view="path/to/main.png",               # 本地文件路径，SDK 自动上传
-    algorithm_model="hunyuan3D-v3.1",           # 可选
-    output_model_format=OutputModelFormat.FBX,
-    face_type=FaceType.TRIANGLE,
-    face_num=500000,
-    back_view="path/to/back.png",               # 可选
-    left_view="path/to/left.png",               # 可选
-    right_view="path/to/right.png",             # 可选
+    main_view="path/to/main.png",                 # 必填，主视图
+    algorithm_model=None,                          # 可选，如 "hunyuan3D-v3.1"；不传则自动选首个可用模型
+    output_model_format=OutputModelFormat.FBX,    # 可选，输出格式（默认 fbx）
+    face_type=FaceType.TRIANGLE,                  # 可选，面数类型（默认三角面）
+    name="gen_high_model",                         # 可选，任务名称
+    main_view_filename=None,                       # 可选，main_view 为 bytes/BinaryIO 时指定文件名
+    face_num=None,                                 # 可选，目标面数（1000~1500000），不传则自动配置
+    back_view=None,                                # 可选，背视图，提升质量
+    back_view_filename=None,
+    left_view=None,                                # 可选，左视图
+    left_view_filename=None,
+    right_view=None,                               # 可选，右视图
+    right_view_filename=None,
 )
 ```
 
@@ -206,14 +218,19 @@ model_id = client.gen_high_model(
 
 ```python
 model_id = client.gen_mid_model(
-    main_view="path/to/main.png",
-    back_view="path/to/back.png",
-    left_view="path/to/left.png",
-    right_view="path/to/right.png",
-    algorithm_model="VISVISE-MeshGen-V1.0.0",   # 可选
-    output_model_format=OutputModelFormat.FBX,
-    face_type=FaceType.TRIANGLE,
-    segment_model_id=None,                       # 可选，2D 分割资产 ID
+    main_view="path/to/main.png",                 # 必填，四视图全部必传
+    back_view="path/to/back.png",                 # 必填
+    left_view="path/to/left.png",                 # 必填
+    right_view="path/to/right.png",               # 必填
+    algorithm_model=None,                          # 可选，如 "VISVISE-MeshGen-V1.0.0"；不传则自动选首个可用模型
+    output_model_format=OutputModelFormat.FBX,    # 可选，输出格式（默认 fbx）
+    face_type=FaceType.TRIANGLE,                  # 可选，面数类型
+    name="gen_mid_model",                          # 可选，任务名称
+    main_view_filename=None,                       # 可选，bytes/BinaryIO 时指定文件名
+    back_view_filename=None,
+    left_view_filename=None,
+    right_view_filename=None,
+    segment_model_id=None,                         # 可选，2D 分割资产 ID（仅中模有效），用于基于分割结果生成
 )
 ```
 
@@ -225,10 +242,18 @@ model_id = client.gen_mid_model(
 
 ```python
 model_id = client.gen_low_model(
-    main_view="path/to/main.png",
-    algorithm_model="Tripo-v1.0-快速生成",      # 可选
-    output_model_format=OutputModelFormat.FBX,
-    face_type=FaceType.TRIANGLE,
+    main_view="path/to/main.png",                 # 必填，主视图
+    algorithm_model=None,                          # 可选，如 "Tripo-v1.0-快速生成"
+    output_model_format=OutputModelFormat.FBX,    # 可选，输出格式
+    face_type=FaceType.TRIANGLE,                  # 可选，面数类型
+    name="gen_low_model",                          # 可选，任务名称
+    main_view_filename=None,                       # 可选，bytes/BinaryIO 文件名
+    back_view=None,                                # 可选，背视图
+    back_view_filename=None,
+    left_view=None,                                # 可选，左视图
+    left_view_filename=None,
+    right_view=None,                               # 可选，右视图
+    right_view_filename=None,
 )
 ```
 
@@ -240,11 +265,14 @@ model_id = client.gen_low_model(
 
 ```python
 model_id = client.gen_mesh_refine(
-    model_path="path/to/model.fbx",             # 本地模型文件，SDK 自动打包上传
-    algorithm_model="VISVISE-MeshRefine-V1.0.0", # 可选
-    input_model_format="fbx",
-    mode=MeshRefineMode.OPTIMIZE,                # 可选，1 布线优化（默认）/ 2 布线加密
-    color_model="path/to/color_model.fbx",       # 可选，带颜色的模型
+    model_path="path/to/model.fbx",               # 必填，输入模型（裸模型 SDK 自动打 zip）
+    algorithm_model=None,                          # 可选，如 "VISVISE-MeshRefine-V1.0.0"
+    input_model_format=OutputModelFormat.FBX,                     # 可选，输入模型格式（默认 fbx）
+    name="gen_mesh_refine",                        # 可选，任务名称
+    filename=None,                                 # 可选，bytes/BinaryIO 时指定文件名
+    mode=None,                                     # 可选，MeshRefineMode.OPTIMIZE(1, 默认) / DENSIFY(2)
+    color_model=None,                              # 可选，带颜色的模型，用于为输出附加颜色
+    color_model_filename=None,                     # 可选，color_model 文件名
 )
 ```
 
@@ -257,22 +285,15 @@ model_id = client.gen_mesh_refine(
 > 注意：混元模型传 `detail_level`，VISVISE 自研模型传 `face_num`，二选一。
 
 ```python
-# 混元模型
 model_id = client.gen_retopology(
-    model_path="path/to/model.fbx",
-    algorithm_model="hunyuan3D-RTP-v1.5",       # 可选
-    output_model_format=OutputModelFormat.FBX,
-    face_type=FaceType.QUAD,
-    detail_level=DetailLevel.HIGH,
-)
-
-# VISVISE 自研模型
-model_id = client.gen_retopology(
-    model_path="path/to/model.fbx",
-    algorithm_model="VISVISE-RTP-V1.0.0",
-    output_model_format=OutputModelFormat.FBX,
-    face_type=FaceType.QUAD,
-    face_num=10000,
+    model_path="path/to/model.fbx",               # 必填，输入模型
+    algorithm_model=None,                          # 可选，如 "hunyuan3D-RTP-v1.5" / "VISVISE-RTP-V1.0.0"
+    output_model_format=OutputModelFormat.FBX,    # 可选，输出格式
+    face_type=FaceType.QUAD,                      # 可选，面数类型（默认四边面）
+    name="gen_retopology",                         # 可选，任务名称
+    filename=None,                                 # 可选，bytes/BinaryIO 文件名
+    detail_level=DetailLevel.HIGH,                # 可选，混元模型必传：DetailLevel.LOW/MEDIUM/HIGH
+    face_num=None,                                 # 可选，VISVISE 自研模型必传：指定输出面数
 )
 ```
 
@@ -283,17 +304,17 @@ model_id = client.gen_retopology(
 生成多级细节模型（node_type=2），支持抽卡。 → [示例代码](examples/gen_lod.py)
 
 ```python
-from visvise import ReduceFace
-
 model_ids = client.gen_lod(
-    model_path="path/to/model.fbx",
-    reduce_faces=[
+    model_path="path/to/model.fbx",               # 必填，输入模型
+    reduce_faces=[                                 # 必填，减面配置列表
         ReduceFace(reduce_level=1, reduce_percent=50, face_type=FaceType.QUAD),
         ReduceFace(reduce_level=2, reduce_percent=25, face_type=FaceType.QUAD),
     ],
-    algorithm_model="VISVISE-LOD-V1.0.0",       # 可选
-    output_model_format=OutputModelFormat.FBX,
-    gen_times=3,
+    algorithm_model=None,                          # 可选，如 "VISVISE-LOD-V1.0.0"
+    output_model_format=OutputModelFormat.FBX,    # 可选，输出格式
+    name="gen_lod",                                # 可选，任务名称
+    filename=None,                                 # 可选，bytes/BinaryIO 文件名
+    gen_times=3,                                   # 可选，生成次数（抽卡），不需要抽卡传 1
 )
 ```
 
@@ -305,9 +326,11 @@ model_ids = client.gen_lod(
 
 ```python
 model_id = client.gen_uv(
-    model_path="path/to/model.fbx",
-    algorithm_model="hunyuan3D-UV-v2.0",        # 可选
-    enable_auto_smoothing=True,                  # 可选
+    model_path="path/to/model.fbx",               # 必填，输入模型
+    algorithm_model=None,                          # 可选，如 "hunyuan3D-UV-v2.0"
+    name="gen_uv",                                 # 可选，任务名称
+    filename=None,                                 # 可选，bytes/BinaryIO 文件名
+    enable_auto_smoothing=None,                    # 可选，是否启用自动平滑
 )
 ```
 
@@ -317,15 +340,18 @@ model_id = client.gen_uv(
 
 为模型生成贴图纹理（node_type=8）。 → [示例代码](examples/gen_texture.py)
 
-```python
-from visvise import View
+> `input_view.main_view` 与 `prompt` 至少传一个，可同时传入。
 
+```python
 model_id = client.gen_texture(
-    model_path="path/to/model.fbx",
-    algorithm_model="hunyuan3D-TEX-v2.0",       # 可选
-    input_view=View(main_view="path/to/ref.png"),
-    resolution=2048,
-    prompt="写实风格",                            # 可选
+    model_path="path/to/model.fbx",               # 必填，输入模型
+    algorithm_model=None,                          # 可选，如 "hunyuan3D-TEX-v2.0"
+    name="gen_texture",                            # 可选，任务名称
+    filename=None,                                 # 可选，bytes/BinaryIO 文件名
+    input_view=View(main_view="path/to/ref.png"), # 可选，原画视图（与 prompt 至少传一个）
+    resolution=None,                               # 可选，分辨率（如 1024 / 2048）
+    unwarp_uv=None,                                # 可选，是否同时展开 UV
+    prompt=None,                                   # 可选，贴图文本提示词
 )
 ```
 
@@ -337,12 +363,14 @@ model_id = client.gen_texture(
 
 ```python
 model_id = client.gen_rigging(
-    model_path="path/to/model.fbx",             # 裸模型文件即可，SDK 自动打包
-    algorithm_model="VISVISE-GoRigging-V1.0.0", # 可选
-    mesh_category="humanoid",                    # "humanoid"（人形）或 "tetrapod"（四足）
+    model_path="path/to/model.fbx",               # 必填，裸模型文件即可，SDK 自动打包
+    algorithm_model=None,                          # 可选，如 "VISVISE-GoRigging-V1.0.0"
+    mesh_category="humanoid",                     # 可选，"humanoid"（人形，默认）或 "tetrapod"（四足）
+    name="gen_rigging",                            # 可选，任务名称
+    filename=None,                                 # 可选，bytes/BinaryIO 文件名
+    template_skeleton=None,                        # 可选，模板骨骼，传入后将基于该模板进行架设
+    template_skeleton_filename=None,               # 可选，template_skeleton 文件名
 )
-rig = client.wait_model(model_id)
-print("骨骼模型：", rig.output_model)
 ```
 
 ---
@@ -353,13 +381,13 @@ print("骨骼模型：", rig.output_model)
 
 ```python
 model_id = client.gen_skinning(
-    model_path="path/to/rigged_model.fbx",      # 带骨骼的模型文件
-    mesh_names=["Body_Mesh", "Hair_Mesh"],       # 需要蒙皮的网格名称列表
-    joint_names=["Bip001", "Bip001 Pelvis"],     # 需要蒙皮的骨骼名称列表
-    algorithm_model="VISVISE-GoSkinning-V1.0.0", # 可选
+    model_path="path/to/rigged_model.fbx",        # 必填，带骨骼的模型文件
+    mesh_names=["Body_Mesh", "Hair_Mesh"],         # 必填，需要蒙皮的网格名称列表
+    joint_names=["Bip001", "Bip001 Pelvis"],       # 必填，需要蒙皮的骨骼名称列表
+    algorithm_model=None,                          # 可选，如 "VISVISE-GoSkinning-V1.0.0"
+    name="gen_skinning",                           # 可选，任务名称
+    filename=None,                                 # 可选，bytes/BinaryIO 文件名
 )
-skin = client.wait_model(model_id)
-print("蒙皮模型：", skin.output_model)
 ```
 
 ---
@@ -370,12 +398,16 @@ print("蒙皮模型：", skin.output_model)
 
 ```python
 model_id = client.gen_video_motion(
-    model_path="path/to/model.zip",
-    video_path="path/to/dance.mp4",
-    algorithm_model="VISVISE-FramingAI-Base-V1.5.0", # 可选
-    output_model_format=OutputModelFormat.FBX,
-    with_hand=True,
-    multiple_track=False,
+    model_path="path/to/model.zip",               # 必填，模型 zip 包
+    video_path="path/to/dance.mp4",               # 必填，驱动视频
+    algorithm_model=None,                          # 可选，如 "VISVISE-FramingAI-Base-V1.5.0"
+    output_model_format=OutputModelFormat.FBX,    # 可选，输出格式
+    name="gen_video_motion",                       # 可选，任务名称
+    model_filename=None,                           # 可选，model_path 为 bytes/BinaryIO 时指定文件名
+    video_filename=None,                           # 可选，video_path 文件名
+    with_hand=None,                                # 可选，是否开启手部捕捉
+    multiple_track=None,                           # 可选，是否开启多人捕捉
+    rotate_axis_angle=None,                        # 可选，旋转轴角 [x, y, z]（弧度）
 )
 ```
 
@@ -387,10 +419,12 @@ model_id = client.gen_video_motion(
 
 ```python
 model_ids = client.gen_text_motion(
-    model_path="path/to/model.zip",
-    prompt="一个人在跳街舞",
-    algorithm_model="VISVISE-TextMotion-V1.1.0", # 可选
-    output_model_format=OutputModelFormat.FBX,
+    model_path="path/to/model.zip",               # 必填，模型 zip 包
+    prompt="一个人在跳街舞",                        # 必填，动画提示词
+    algorithm_model=None,                          # 可选，如 "VISVISE-TextMotion-V1.1.0"
+    output_model_format=OutputModelFormat.FBX,    # 可选，输出格式
+    name="gen_text_motion",                        # 可选，任务名称
+    filename=None,                                 # 可选，bytes/BinaryIO 文件名
 )
 # model_ids 包含 4 个 ID，等待其中你需要的那个即可
 ```
@@ -403,10 +437,16 @@ model_ids = client.gen_text_motion(
 
 ```python
 model_ids = client.gen_pose(
-    model_path="path/to/model.zip",
-    input_images=["path/to/pose_ref_1.png", "path/to/pose_ref_2.png"],
-    algorithm_model="VISVISE-PosingAI-V1.0.0",  # 可选
-    output_model_format=OutputModelFormat.FBX,
+    model_path="path/to/model.zip",               # 必填，FBX 模型 zip 包
+    input_images=[                                 # 必填，参考图片列表（1~10 张）
+        "path/to/pose_ref_1.png",
+        "path/to/pose_ref_2.png",
+    ],
+    algorithm_model=None,                          # 可选，如 "VISVISE-PosingAI-V1.0.0"
+    output_model_format=OutputModelFormat.FBX,    # 可选，输出格式
+    name="gen_pose",                               # 可选，任务名称
+    model_filename=None,                           # 可选，model_path 为 bytes/BinaryIO 时指定文件名
+    image_filenames=None,                          # 可选，与 input_images 一一对应的文件名列表
 )
 ```
 

@@ -994,6 +994,8 @@ class VisviseClient:
         name: str = "gen_rigging",
         *,
         filename: Optional[str] = None,
+        template_skeleton: Optional[FileInput] = None,
+        template_skeleton_filename: Optional[str] = None,
     ) -> str:
         """骨骼架设（node_type=5）。
 
@@ -1008,6 +1010,9 @@ class VisviseClient:
             mesh_category: 模型类别，``"humanoid"``（人形，默认）或 ``"tetrapod"``（四足动物）。
             name: 任务名称。
             filename: bytes/BinaryIO 输入时指定模型文件名（含扩展名，如 ``model.fbx``）。
+            template_skeleton: 模板骨骼，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                可选，传入后将基于该模板骨骼进行架设。
+            template_skeleton_filename: template_skeleton 为 bytes/BinaryIO 时指定文件名。
 
         Returns:
             新生成的模型 ID。
@@ -1031,10 +1036,16 @@ class VisviseClient:
 
         # 3. 上传并创建任务
         cos_url = self._resolve_file(zip_bytes, filename=zip_filename)
+        go_rigging_params: dict = {"algorithm_model": resolved_model}
+        if template_skeleton is not None:
+            go_rigging_params["template_skeleton"] = self._resolve_model_file(
+                template_skeleton, filename=template_skeleton_filename
+            )
+
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.RIGGING,
-            params={},
+            params={"go_rigging_params": go_rigging_params},
             input_model=cos_url,
         )[0]
 
