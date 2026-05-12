@@ -44,13 +44,13 @@ Python SDK for the VISVISE Weaver OpenAPI. It provides:
 Install directly from the GitHub repository (Tencent Cloud COS dependency included):
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.1
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.2
 ```
 
 Or via SSH:
 
 ```bash
-pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.0.1
+pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.0.2
 ```
 
 > **Note:** The Tencent Cloud COS SDK is bundled by default; local file auto-upload works out of the box.
@@ -163,6 +163,11 @@ High-level methods bundle "COS upload + async task creation" into a single call.
 
 > **About `algorithm_model`:** Every `gen_xxx` method's `algorithm_model` is optional. When omitted, the SDK calls `list_algorithm_model` and uses the first available model for the current account.
 
+> **About file inputs:** All file parameters (e.g. `main_view` / `model_path` / `video_path` / `input_images`) accept three forms:
+> - **Local path** (`str`): the SDK uploads the file automatically.
+> - **VISVISE COS URL** (`str`): pass a `https://...myqcloud.com/...` link directly; the SDK skips upload.
+> - **Binary content** (`bytes` / `BinaryIO`): the SDK auto-detects the format via magic bytes (images PNG/JPEG/GIF/BMP/WebP/TIFF, 3D models FBX/OBJ/GLB/GLTF, videos MP4/MOV/WebM/AVI, ZIP) and uploads as `<uuid>.<sniffed-ext>` — no filename required from the caller.
+
 The examples below share the following imports:
 
 ```python
@@ -187,13 +192,9 @@ model_id = client.gen_360(
     name="gen_360",                      # optional, task name
     enable_a_pose=None,                  # optional, enable A-Pose (True/False)
     style=None,                          # optional, style (VISVISE proprietary models only): grayscale / photoreal / Q-toon / pixel
-    main_view_filename=None,             # optional, filename when main_view is bytes/BinaryIO
     back_view=None,                      # optional, back view to improve quality
-    back_view_filename=None,             # optional, back_view filename
     left_view=None,                      # optional, left view
-    left_view_filename=None,             # optional, left_view filename
     right_view=None,                     # optional, right view
-    right_view_filename=None,            # optional, right_view filename
 )
 ```
 
@@ -210,14 +211,10 @@ model_id = client.gen_high_model(
     output_model_format=OutputModelFormat.FBX,    # optional, output format (default fbx)
     face_type=FaceType.TRIANGLE,                  # optional, face type (default triangle)
     name="gen_high_model",                         # optional, task name
-    main_view_filename=None,                       # optional, filename when main_view is bytes/BinaryIO
     face_num=None,                                 # optional, target face count (1000-1500000); auto-tuned if omitted
     back_view=None,                                # optional, back view to improve quality
-    back_view_filename=None,
     left_view=None,                                # optional, left view
-    left_view_filename=None,
     right_view=None,                               # optional, right view
-    right_view_filename=None,
 )
 ```
 
@@ -237,10 +234,6 @@ model_id = client.gen_mid_model(
     output_model_format=OutputModelFormat.FBX,    # optional, output format
     face_type=FaceType.TRIANGLE,                  # optional, face type
     name="gen_mid_model",                          # optional, task name
-    main_view_filename=None,                       # optional, filename when bytes/BinaryIO
-    back_view_filename=None,
-    left_view_filename=None,
-    right_view_filename=None,
     segment_model_id=None,                         # optional, 2D segmentation asset ID (mid-poly only)
 )
 ```
@@ -258,13 +251,9 @@ model_id = client.gen_low_model(
     output_model_format=OutputModelFormat.FBX,    # optional, output format
     face_type=FaceType.TRIANGLE,                  # optional, face type
     name="gen_low_model",                          # optional, task name
-    main_view_filename=None,                       # optional, filename when bytes/BinaryIO
     back_view=None,                                # optional, back view
-    back_view_filename=None,
     left_view=None,                                # optional, left view
-    left_view_filename=None,
     right_view=None,                               # optional, right view
-    right_view_filename=None,
 )
 ```
 
@@ -280,10 +269,8 @@ model_id = client.gen_mesh_refine(
     algorithm_model=None,                          # optional, e.g. "VISVISE-MeshRefine-V1.0.0"
     input_model_format="fbx",                     # optional, input format (default fbx)
     name="gen_mesh_refine",                        # optional, task name
-    filename=None,                                 # optional, filename when bytes/BinaryIO
     mode=None,                                     # optional, MeshRefineMode.OPTIMIZE(1, default) / DENSIFY(2)
     color_model=None,                              # optional, colored model used to attach color info
-    color_model_filename=None,                     # optional, color_model filename
 )
 ```
 
@@ -302,7 +289,6 @@ model_id = client.gen_retopology(
     output_model_format=OutputModelFormat.FBX,    # optional, output format
     face_type=FaceType.QUAD,                      # optional, face type (default quad)
     name="gen_retopology",                         # optional, task name
-    filename=None,                                 # optional, filename when bytes/BinaryIO
     detail_level=DetailLevel.HIGH,                # optional (required by Hunyuan): DetailLevel.LOW/MEDIUM/HIGH
     face_num=None,                                 # optional (required by VISVISE proprietary): target face count
 )
@@ -324,7 +310,6 @@ model_ids = client.gen_lod(
     algorithm_model=None,                          # optional, e.g. "VISVISE-LOD-V1.0.0"
     output_model_format=OutputModelFormat.FBX,    # optional, output format
     name="gen_lod",                                # optional, task name
-    filename=None,                                 # optional, filename when bytes/BinaryIO
     gen_times=3,                                   # optional, number of variants (use 1 to disable multi-shot)
 )
 ```
@@ -340,7 +325,6 @@ model_id = client.gen_uv(
     model_path="path/to/model.fbx",               # required, input model
     algorithm_model=None,                          # optional, e.g. "hunyuan3D-UV-v2.0"
     name="gen_uv",                                 # optional, task name
-    filename=None,                                 # optional, filename when bytes/BinaryIO
     enable_auto_smoothing=None,                    # optional, enable auto-smoothing
 )
 ```
@@ -358,7 +342,6 @@ model_id = client.gen_texture(
     model_path="path/to/model.fbx",               # required, input model
     algorithm_model=None,                          # optional, e.g. "hunyuan3D-TEX-v2.0"
     name="gen_texture",                            # optional, task name
-    filename=None,                                 # optional, filename when bytes/BinaryIO
     input_view=View(main_view="path/to/ref.png"), # optional, reference view (or use prompt instead)
     resolution=None,                               # optional, resolution (e.g. 1024 / 2048)
     unwarp_uv=None,                                # optional, also unwrap UV
@@ -378,9 +361,7 @@ model_id = client.gen_rigging(
     algorithm_model=None,                          # optional, e.g. "VISVISE-GoRigging-V1.0.0"
     mesh_category="humanoid",                     # optional, "humanoid" (default) or "tetrapod"
     name="gen_rigging",                            # optional, task name
-    filename=None,                                 # optional, filename when bytes/BinaryIO
     template_skeleton=None,                        # optional, template skeleton to base the rig on
-    template_skeleton_filename=None,               # optional, template_skeleton filename
 )
 ```
 
@@ -397,7 +378,6 @@ model_id = client.gen_skinning(
     joint_names=["Bip001", "Bip001 Pelvis"],       # required, joints to skin
     algorithm_model=None,                          # optional, e.g. "VISVISE-GoSkinning-V1.0.0"
     name="gen_skinning",                           # optional, task name
-    filename=None,                                 # optional, filename when bytes/BinaryIO
 )
 ```
 
@@ -414,8 +394,6 @@ model_id = client.gen_video_motion(
     algorithm_model=None,                          # optional, e.g. "VISVISE-FramingAI-Base-V1.5.0"
     output_model_format=OutputModelFormat.FBX,    # optional, output format
     name="gen_video_motion",                       # optional, task name
-    model_filename=None,                           # optional, filename when model_path is bytes/BinaryIO
-    video_filename=None,                           # optional, video_path filename
     with_hand=None,                                # optional, enable hand capture
     multiple_track=None,                           # optional, enable multi-person capture
     rotate_axis_angle=None,                        # optional, rotation axis-angle [x, y, z] (radians)
@@ -435,7 +413,6 @@ model_ids = client.gen_text_motion(
     algorithm_model=None,                          # optional, e.g. "VISVISE-TextMotion-V1.1.0"
     output_model_format=OutputModelFormat.FBX,    # optional, output format
     name="gen_text_motion",                        # optional, task name
-    filename=None,                                 # optional, filename when bytes/BinaryIO
 )
 # model_ids contains 4 IDs, wait for whichever you prefer
 ```
@@ -456,8 +433,6 @@ model_ids = client.gen_pose(
     algorithm_model=None,                          # optional, e.g. "VISVISE-PosingAI-V1.0.0"
     output_model_format=OutputModelFormat.FBX,    # optional, output format
     name="gen_pose",                               # optional, task name
-    model_filename=None,                           # optional, filename when model_path is bytes/BinaryIO
-    image_filenames=None,                          # optional, filenames for each input_images entry
 )
 ```
 

@@ -44,12 +44,122 @@ def _is_zip_bytes(data: bytes) -> bool:
     return data[:4] == b"PK\x03\x04"
 
 
+def _sniff_extension(data: bytes, default: str = ".bin") -> str:
+    """通过文件头 magic bytes 嗅探常见格式，返回带点号的扩展名。
+
+    支持识别的格式（覆盖 SDK 三大输入类型：图片 / 3D 模型 / 视频）：
+
+    * **图片**：PNG / JPEG / GIF / BMP / WebP / TIFF
+    * **3D 模型**：FBX（二进制 / ASCII）/ GLB / OBJ / GLTF（JSON）
+    * **视频**：MP4 / MOV（``ftyp`` box）/ WebM / AVI
+    * **压缩包**：ZIP
+
+    无法识别时返回 ``default`` 后缀。
+
+    Args:
+        data: 二进制内容，至少 12 字节才能稳定识别。
+        default: 无法识别时的回退后缀，调用方按业务语义提供
+                 （如模型类输入回退 ``.fbx``，视图类输入回退 ``.bin``）。
+
+    Returns:
+        ``"."`` 开头的扩展名字符串，如 ``.png`` / ``.fbx`` / ``.mp4``。
+    """
+    if not data:
+        return default if default.startswith(".") else "." + default
+
+    # ── 图片 ──
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+        return ".gif"
+    if data.startswith(b"BM"):
+        return ".bmp"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return ".webp"
+    if data[:4] in (b"II*\x00", b"MM\x00*"):
+        return ".tiff"
+
+    # ── 3D 模型 ──
+    if data.startswith(b"Kaydara FBX Binary"):
+        return ".fbx"
+    if data.startswith(b"glTF"):
+        return ".glb"
+    # ASCII FBX：以 ";" 注释或 "FBXHeaderExtension" 起首
+    if data[:1] == b";" and b"FBX" in data[:200]:
+        return ".fbx"
+    if data.startswith(b"FBXHeaderExtension"):
+        return ".fbx"
+    # OBJ：文本格式，以 "v "、"vn "、"vt "、"f "、"# " 之一开头
+    head = data[:64].lstrip()
+    if (
+        head.startswith(b"v ")
+        or head.startswith(b"vn ")
+        or head.startswith(b"vt ")
+        or head.startswith(b"f ")
+        or head.startswith(b"o ")
+        or head.startswith(b"g ")
+        or head.startswith(b"mtllib ")
+    ):
+        return ".obj"
+
+    # ── 视频 ──
+    # MP4 / MOV：偏移 4 字节为 "ftyp"
+    if data[4:8] == b"ftyp":
+        brand = data[8:12]
+        if brand in (b"qt  ", b"moov"):
+            return ".mov"
+        return ".mp4"
+    # WebM / Matroska：EBML magic
+    if data.startswith(b"\x1a\x45\xdf\xa3"):
+        return ".webm"
+    # AVI：RIFF....AVI_
+    if data[:4] == b"RIFF" and data[8:12] == b"AVI ":
+        return ".avi"
+
+    # ── 压缩包 ──
+    if _is_zip_bytes(data):
+        return ".zip"
+
+    # ── glTF（JSON 文本）/ OBJ（注释行）兜底 ──
+    stripped = data[:128].lstrip()
+    if stripped.startswith(b"{") and b'"asset"' in data[:256] and b'"version"' in data[:512]:
+        return ".gltf"
+    if stripped.startswith(b"#") and (b"\nv " in data[:512] or b"\no " in data[:512]):
+        return ".obj"
+
+    # 无法识别 → 回退
+    return default if default.startswith(".") else "." + default
+
+
 def _wrap_in_zip(data: bytes, inner_filename: str) -> bytes:
     """将单个文件打包为内存 zip，返回 zip bytes。"""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(inner_filename, data)
     return buf.getvalue()
+
+
+def _gen_random_filename(suffix: str = ".bin") -> str:
+    """为 bytes/BinaryIO 输入自动生成唯一文件名。
+
+    Args:
+        suffix: 文件扩展名，可带或不带前导点号。
+    """
+    if not suffix.startswith("."):
+        suffix = "." + suffix
+    return f"{uuid.uuid4().hex}{suffix}"
+
+
+def _gen_random_filename_for(data: bytes, default_ext: str = ".bin") -> str:
+    """根据二进制内容自动嗅探扩展名后生成唯一文件名。
+
+    Args:
+        data: 待识别的二进制内容。
+        default_ext: 无法识别时使用的回退扩展名。
+    """
+    return _gen_random_filename(_sniff_extension(data, default=default_ext))
 
 
 class VisviseClient:
@@ -125,15 +235,13 @@ class VisviseClient:
           若为 ``https://`` 等 URL 字符串，直接原样返回，不上传。
           ⚠️  传入 URL 时，必须是通过本 SDK 或 VISVISE 平台上传所得的 VISVISE 平台 COS URL，
           不能使用其他业务或第三方的 COS 地址，否则服务端无法访问该文件。
-        * **bytes**：原始二进制内容，直接上传。
+        * **bytes**：原始二进制内容，直接上传，文件名自动用 uuid 生成。
         * **文件对象**（``IO[bytes]``，如 ``open(..., "rb")``、``BytesIO``）：
-          读取内容后上传。
+          读取内容后上传，文件名自动用 uuid 生成。
 
         Args:
             source: 文件输入，支持本地路径 / bytes / BinaryIO。
-            filename: 上传到 COS 时使用的文件名。
-                      bytes/BinaryIO 输入时建议提供以便平台识别格式；
-                      省略时自动生成随机名。
+            filename: 内部使用的文件名（含扩展名）。bytes/BinaryIO 输入时若不传则自动用 uuid 生成。
             is_temp: 是否临时文件（7天后自动删除）。
 
         Returns:
@@ -180,17 +288,17 @@ class VisviseClient:
                 cos_client.put_object(Bucket=cred.bucket, Body=f, Key=cos_key)
 
         elif isinstance(source, (bytes, bytearray)):
-            # 二进制内容
-            _filename = filename or f"upload_{uuid.uuid4().hex[:8]}.bin"
+            # 二进制内容：未指定 filename 则嗅探格式后用 uuid 生成
+            data_bytes = bytes(source)
+            _filename = filename or _gen_random_filename_for(data_bytes, default_ext=".bin")
             cos_key = f"{path_prefix}{_filename}"
-            logger.info("上传 bytes (%d bytes) → cos://%s/%s", len(source), cred.bucket, cos_key)
-            cos_client.put_object(Bucket=cred.bucket, Body=source, Key=cos_key)
+            logger.info("上传 bytes (%d bytes) → cos://%s/%s", len(data_bytes), cred.bucket, cos_key)
+            cos_client.put_object(Bucket=cred.bucket, Body=data_bytes, Key=cos_key)
 
         else:
-            # 文件对象 (BinaryIO / BytesIO)
+            # 文件对象 (BinaryIO / BytesIO)：未指定 filename 则嗅探格式后用 uuid 生成
             data = source.read()
-            _filename = filename or getattr(source, "name", None)
-            _filename = os.path.basename(_filename) if _filename else f"upload_{uuid.uuid4().hex[:8]}.bin"
+            _filename = filename or _gen_random_filename_for(data, default_ext=".bin")
             cos_key = f"{path_prefix}{_filename}"
             logger.info("上传文件对象 (%d bytes) → cos://%s/%s", len(data), cred.bucket, cos_key)
             cos_client.put_object(Bucket=cred.bucket, Body=data, Key=cos_key)
@@ -211,7 +319,6 @@ class VisviseClient:
         self,
         source: FileInput,
         json_data: dict,
-        filename: Optional[str] = None,
     ) -> tuple[bytes, str]:
         """从模型文件输入构建包含 JSON 参数文件的 zip 包。
 
@@ -223,14 +330,13 @@ class VisviseClient:
            - 用传入的 ``json_data`` 替换（或新增）同名 ``.json`` 文件。
            - 重新打包成新的 zip。
         3. **若原始内容不是 zip**（裸模型文件，如 .fbx / .obj / .glb）：
-           - 以 ``filename`` 命名该文件，生成同名 ``.json``，一起打包成 zip。
+           - 本地路径自动取原始文件名；bytes/BinaryIO 自动用 uuid 生成 ``.fbx`` 文件名，
+             生成同名 ``.json``，一起打包成 zip。
 
         Args:
             source: 模型文件输入，支持本地路径（str）、bytes 或 BinaryIO。
                     ⚠️ 不接受 COS URL。
             json_data: 要写入 json 参数文件的 Python dict。
-            filename: bytes/BinaryIO 输入时指定文件名（含扩展名）。
-                      如省略则自动生成。
 
         Returns:
             ``(zip_bytes, zip_filename)``：打包后的 zip 内容和文件名。
@@ -246,20 +352,16 @@ class VisviseClient:
                 raise ValueError(
                     f"model_path 只接受本地文件路径或二进制内容，不接受 COS URL：{source!r}"
                 )
-            src_filename = filename or os.path.basename(source)
+            src_filename = os.path.basename(source)
             with open(source, "rb") as f:
                 raw = f.read()
         elif isinstance(source, (bytes, bytearray)):
             raw = bytes(source)
-            src_filename = filename or f"model_{uuid.uuid4().hex[:8]}.fbx"
+            # 模型类输入：嗅探 .fbx/.obj/.glb 等扩展名，无法识别时回退 .fbx
+            src_filename = _gen_random_filename_for(raw, default_ext=".fbx")
         else:
             raw = source.read()
-            src_filename = filename or getattr(source, "name", None)
-            src_filename = (
-                os.path.basename(src_filename)
-                if src_filename
-                else f"model_{uuid.uuid4().hex[:8]}.fbx"
-            )
+            src_filename = _gen_random_filename_for(raw, default_ext=".fbx")
 
         json_bytes = _json.dumps(json_data, ensure_ascii=False, indent=2).encode("utf-8")
 
@@ -322,7 +424,6 @@ class VisviseClient:
     def _resolve_model_file(
         self,
         source: FileInput,
-        filename: Optional[str] = None,
         is_temp: bool = False,
     ) -> str:
         """上传模型文件到 COS，自动处理 zip 打包逻辑。
@@ -332,16 +433,13 @@ class VisviseClient:
           ⚠️  必须是通过本 SDK 或 VISVISE 平台上传所得的 VISVISE 平台 COS URL，不能使用其他业务的地址。
         - 已是 **zip 文件**（本地 .zip 路径 / zip 格式的 bytes/BinaryIO）：直接上传。
         - 是 **模型文件**（.fbx / .obj / .glb 等本地路径 / 对应 bytes/BinaryIO）：
-          自动打包为 zip 后上传，zip 内文件名保留原始文件名。
+          自动打包为 zip 后上传。bytes/BinaryIO 输入的文件名用 uuid 自动生成。
 
         Args:
             source: 文件输入，支持三种形式：
                 - 本地路径（str）
                 - VISVISE 平台 COS URL（str，必须是本平台上传所得地址）
                 - bytes 或 BinaryIO（二进制内容）
-            filename: bytes/BinaryIO 输入时指定文件名（含扩展名，如 ``model.fbx``）。
-                      用于判断是否需要打包，以及 zip 内部的文件名。
-                      若省略且无法从 source 推断，则视为 zip 直接上传。
             is_temp: 是否临时文件。
 
         Returns:
@@ -372,33 +470,24 @@ class VisviseClient:
                 return self._resolve_file(zip_bytes, filename=zip_name, is_temp=is_temp)
             else:
                 # .zip 或其他格式，直接上传
-                return self._resolve_file(source, filename=filename, is_temp=is_temp)
+                return self._resolve_file(source, is_temp=is_temp)
 
         # ── bytes / BinaryIO：读取内容 ──
         if isinstance(source, (bytes, bytearray)):
             raw = bytes(source)
         else:
             raw = source.read()
-            # 尝试从文件对象 name 属性获取文件名
-            if filename is None:
-                name_attr = getattr(source, "name", None)
-                if name_attr:
-                    filename = os.path.basename(name_attr)
 
         # 判断是否已经是 zip
         if _is_zip_bytes(raw):
-            _fname = filename or f"model_{uuid.uuid4().hex[:8]}.zip"
+            _fname = _gen_random_filename(".zip")
             logger.debug("内容已是 zip 格式，直接上传：%s", _fname)
             return self._resolve_file(raw, filename=_fname, is_temp=is_temp)
 
-        # 非 zip：需要打包
-        if filename:
-            inner_name = filename
-            stem = os.path.splitext(filename)[0]
-            zip_name = f"{stem}.zip"
-        else:
-            inner_name = f"model_{uuid.uuid4().hex[:8]}.fbx"
-            zip_name = inner_name.replace(".fbx", ".zip")
+        # 非 zip：嗅探扩展名（fbx/obj/glb 等），无法识别时回退 .fbx 后打包
+        inner_name = _gen_random_filename_for(raw, default_ext=".fbx")
+        stem = os.path.splitext(inner_name)[0]
+        zip_name = f"{stem}.zip"
 
         zip_bytes = _wrap_in_zip(raw, inner_name)
         logger.info("自动打包二进制内容（%d bytes）→ %s 后上传", len(raw), zip_name)
@@ -537,28 +626,23 @@ class VisviseClient:
         algorithm_model: Optional[str] = None,
         name: str = "gen_360",
         *,
-        main_view_filename: Optional[str] = None,
         enable_a_pose: Optional[bool] = None,
         style: Optional[str] = None,
         back_view: Optional[FileInput] = None,
-        back_view_filename: Optional[str] = None,
         left_view: Optional[FileInput] = None,
-        left_view_filename: Optional[str] = None,
         right_view: Optional[FileInput] = None,
-        right_view_filename: Optional[str] = None,
     ) -> str:
         """图生360：从图片生成多视图。
 
         Args:
             main_view: 主视图，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
             algorithm_model: 算法模型名称（如 ``hunyuan3D-MultiView-v3.0``）。
                 可选，若不传则自动获取当前账号可用的第一个模型。
             name: 任务名称。
-            main_view_filename: bytes/BinaryIO 输入时指定文件名（含扩展名）。
             enable_a_pose: 是否开启 A-Pose。
             style: 风格类型（仅 VISVISE 自研模型支持）。
             back_view / left_view / right_view: 可选的额外视图，同样支持三种输入形式。
-            back_view_filename / left_view_filename / right_view_filename: 对应文件名。
 
         Returns:
             新生成的模型 ID。
@@ -567,10 +651,10 @@ class VisviseClient:
             WeaverError / 子类
         """
         view = View(
-            main_view=self._resolve_file(main_view, filename=main_view_filename),
-            back_view=self._resolve_file(back_view, filename=back_view_filename) if back_view is not None else None,
-            left_view=self._resolve_file(left_view, filename=left_view_filename) if left_view is not None else None,
-            right_view=self._resolve_file(right_view, filename=right_view_filename) if right_view is not None else None,
+            main_view=self._resolve_file(main_view),
+            back_view=self._resolve_file(back_view) if back_view is not None else None,
+            left_view=self._resolve_file(left_view) if left_view is not None else None,
+            right_view=self._resolve_file(right_view) if right_view is not None else None,
         )
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_360)
         img360: dict = {"algorithm_model": resolved_model}
@@ -595,25 +679,21 @@ class VisviseClient:
         face_type: int = 1,
         name: str = "gen_high_model",
         *,
-        main_view_filename: Optional[str] = None,
         face_num: Optional[int] = None,
         back_view: Optional[FileInput] = None,
-        back_view_filename: Optional[str] = None,
         left_view: Optional[FileInput] = None,
-        left_view_filename: Optional[str] = None,
         right_view: Optional[FileInput] = None,
-        right_view_filename: Optional[str] = None,
     ) -> str:
         """图生高模（node_type=3）。
 
         Args:
             main_view: 主视图，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
             algorithm_model: 算法模型名称（可通过 list_algorithm_model(node_type=3) 获取）。
                 可选，若不传则自动获取当前账号可用的第一个模型。
             output_model_format: 输出格式 fbx/obj/glb，默认 fbx。
             face_type: 面数类型 1:三角面 2:四边面，默认 1。
             name: 任务名称。
-            main_view_filename: bytes/BinaryIO 时指定文件名。
             face_num: 面数，取值范围 1000~1500000，不传自动配置。
             back_view / left_view / right_view: 额外视图，同样支持三种输入形式。
 
@@ -621,10 +701,10 @@ class VisviseClient:
             新生成的模型 ID。
         """
         view = View(
-            main_view=self._resolve_file(main_view, filename=main_view_filename),
-            back_view=self._resolve_file(back_view, filename=back_view_filename) if back_view is not None else None,
-            left_view=self._resolve_file(left_view, filename=left_view_filename) if left_view is not None else None,
-            right_view=self._resolve_file(right_view, filename=right_view_filename) if right_view is not None else None,
+            main_view=self._resolve_file(main_view),
+            back_view=self._resolve_file(back_view) if back_view is not None else None,
+            left_view=self._resolve_file(left_view) if left_view is not None else None,
+            right_view=self._resolve_file(right_view) if right_view is not None else None,
         )
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_HIGH)
         img_params: dict = {
@@ -655,10 +735,6 @@ class VisviseClient:
         face_type: int = 1,
         name: str = "gen_mid_model",
         *,
-        main_view_filename: Optional[str] = None,
-        back_view_filename: Optional[str] = None,
-        left_view_filename: Optional[str] = None,
-        right_view_filename: Optional[str] = None,
         segment_model_id: Optional[str] = None,
     ) -> str:
         """图生中模（node_type=11）。
@@ -667,22 +743,22 @@ class VisviseClient:
 
         Args:
             main_view / back_view / left_view / right_view: 四视图，均支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
             algorithm_model: 算法模型（可通过 list_algorithm_model(node_type=11) 获取）。
                 可选，若不传则自动获取当前账号可用的第一个模型。
             output_model_format: 输出格式，默认 fbx。
             face_type: 面数类型，默认 1。
             name: 任务名称。
-            *_filename: bytes/BinaryIO 输入时对应的文件名。
             segment_model_id: 2D 分割资产 ID，传入后将基于分割结果生成模型。
 
         Returns:
             新生成的模型 ID。
         """
         view = View(
-            main_view=self._resolve_file(main_view, filename=main_view_filename),
-            back_view=self._resolve_file(back_view, filename=back_view_filename),
-            left_view=self._resolve_file(left_view, filename=left_view_filename),
-            right_view=self._resolve_file(right_view, filename=right_view_filename),
+            main_view=self._resolve_file(main_view),
+            back_view=self._resolve_file(back_view),
+            left_view=self._resolve_file(left_view),
+            right_view=self._resolve_file(right_view),
         )
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_MID)
         img_params: dict = {
@@ -709,27 +785,24 @@ class VisviseClient:
         face_type: int = 1,
         name: str = "gen_low_model",
         *,
-        main_view_filename: Optional[str] = None,
         back_view: Optional[FileInput] = None,
-        back_view_filename: Optional[str] = None,
         left_view: Optional[FileInput] = None,
-        left_view_filename: Optional[str] = None,
         right_view: Optional[FileInput] = None,
-        right_view_filename: Optional[str] = None,
     ) -> str:
         """图生低模（node_type=13）。
 
         Args:
             main_view: 主视图（必传），支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
             algorithm_model: 算法模型（如 ``Tripo-v1.0-快速生成``）。
                 可选，若不传则自动获取当前账号可用的第一个模型。
             back_view / left_view / right_view: 可选额外视图。
         """
         view = View(
-            main_view=self._resolve_file(main_view, filename=main_view_filename),
-            back_view=self._resolve_file(back_view, filename=back_view_filename) if back_view is not None else None,
-            left_view=self._resolve_file(left_view, filename=left_view_filename) if left_view is not None else None,
-            right_view=self._resolve_file(right_view, filename=right_view_filename) if right_view is not None else None,
+            main_view=self._resolve_file(main_view),
+            back_view=self._resolve_file(back_view) if back_view is not None else None,
+            left_view=self._resolve_file(left_view) if left_view is not None else None,
+            right_view=self._resolve_file(right_view) if right_view is not None else None,
         )
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_LOW)
         img_params: dict = {
@@ -753,26 +826,23 @@ class VisviseClient:
         input_model_format: str = "fbx",
         name: str = "gen_mesh_refine",
         *,
-        filename: Optional[str] = None,
         mode: Optional[int] = None,
         color_model: Optional[FileInput] = None,
-        color_model_filename: Optional[str] = None,
     ) -> str:
         """重布线/布线优化（node_type=10）。
 
         Args:
-            model_path: 输入模型（zip），支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+            model_path: 输入模型，支持本地路径（.fbx/.obj/.glb/.zip）、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名并打包。
             algorithm_model: 算法模型（如 ``VISVISE-MeshRefine-V1.0.0``）。
                 可选，若不传则自动获取当前账号可用的第一个模型。
             input_model_format: 输入模型格式，默认 fbx。
             name: 任务名称。
-            filename: bytes/BinaryIO 时指定文件名（建议带 .zip 后缀）。
             mode: 模式：1 布线优化（默认），2 布线加密。
             color_model: 带颜色的模型，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
                 传入后将为输出模型附加颜色信息。
-            color_model_filename: color_model 为 bytes/BinaryIO 时指定文件名。
         """
-        cos_url = self._resolve_model_file(model_path, filename=filename)
+        cos_url = self._resolve_model_file(model_path)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.MESH_REFINE)
         params: dict = {
             "algorithm_model": resolved_model,
@@ -781,7 +851,7 @@ class VisviseClient:
         if mode is not None:
             params["mode"] = mode
         if color_model is not None:
-            params["color_model"] = self._resolve_model_file(color_model, filename=color_model_filename)
+            params["color_model"] = self._resolve_model_file(color_model)
 
         return self.api.gen_3d_model(
             name=name,
@@ -800,27 +870,26 @@ class VisviseClient:
         face_type: int = 2,
         name: str = "gen_retopology",
         *,
-        filename: Optional[str] = None,
         detail_level: Optional[int] = None,
         face_num: Optional[int] = None,
     ) -> str:
         """重拓扑（node_type=1）。
 
         Args:
-            model_path: 输入模型（zip），支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+            model_path: 输入模型，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名并打包。
             algorithm_model: 算法模型（如 ``hunyuan3D-RTP-v1.5``）。
                 可选，若不传则自动获取当前账号可用的第一个模型。
             output_model_format: 输出格式，默认 fbx。
             face_type: 面数类型 1:三角面 2:四边面，默认 2。
             name: 任务名称。
-            filename: bytes/BinaryIO 时指定文件名。
             detail_level: 精细程度 1/2/3（混元模型必传）。
             face_num: 指定面数（VISVISE 自研模型必传）。
 
         Note:
             ``detail_level`` 和 ``face_num`` 根据算法模型二选一。
         """
-        cos_url = self._resolve_model_file(model_path, filename=filename)
+        cos_url = self._resolve_model_file(model_path)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.RE_TOPOLOGY)
         params: dict = {
             "algorithm_model": resolved_model,
@@ -849,25 +918,24 @@ class VisviseClient:
         output_model_format: str = "fbx",
         name: str = "gen_lod",
         *,
-        filename: Optional[str] = None,
         gen_times: int = 3,
     ) -> list[str]:
         """LOD 减面（node_type=2）。
 
         Args:
-            model_path: 输入模型（zip），支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+            model_path: 输入模型，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名并打包。
             algorithm_model: 算法模型（如 ``VISVISE-LOD-V1.0.0``）。
                 可选，若不传则自动获取当前账号可用的第一个模型。
             reduce_faces: 减面配置列表，参考 :class:`~visvise.models.ReduceFace`。
             output_model_format: 输出格式，默认 fbx。
             name: 任务名称。
-            filename: bytes/BinaryIO 时指定文件名。
             gen_times: 生成次数（用于抽卡），不需要抽卡传 1，建议传 3。
 
         Returns:
             模型 ID 列表（gen_times=3 时返回 3 个 ID）。
         """
-        cos_url = self._resolve_model_file(model_path, filename=filename)
+        cos_url = self._resolve_model_file(model_path)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.LOD)
         return self.api.gen_3d_model(
             name=name,
@@ -889,22 +957,21 @@ class VisviseClient:
         algorithm_model: Optional[str] = None,
         name: str = "gen_uv",
         *,
-        filename: Optional[str] = None,
         enable_auto_smoothing: Optional[bool] = None,
     ) -> str:
         """UV 展开（node_type=9）。
 
         Args:
-            model_path: 输入模型（zip），支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+            model_path: 输入模型，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名并打包。
             algorithm_model: UV 展开算法模型名称。
             name: 任务名称。
-            filename: bytes/BinaryIO 时指定文件名。
             enable_auto_smoothing: 可选，是否启用自动平滑。
 
         Returns:
             新生成的模型 ID。
         """
-        cos_url = self._resolve_model_file(model_path, filename=filename)
+        cos_url = self._resolve_model_file(model_path)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.UV)
         uv_params: dict = {"algorithm_model": resolved_model}
         if enable_auto_smoothing is not None:
@@ -925,7 +992,6 @@ class VisviseClient:
         algorithm_model: Optional[str] = None,
         name: str = "gen_texture",
         *,
-        filename: Optional[str] = None,
         input_view: Optional[View] = None,
         resolution: Optional[int] = None,
         unwarp_uv: Optional[bool] = None,
@@ -934,10 +1000,10 @@ class VisviseClient:
         """贴图纹理生成（node_type=8）。
 
         Args:
-            model_path: 输入模型（zip），支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+            model_path: 输入模型，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名并打包。
             algorithm_model: 贴图算法模型名称。
             name: 任务名称。
-            filename: bytes/BinaryIO 时指定文件名。
             input_view: 原画视图（:class:`~visvise.models.View`），支持传入四视图。
                         ``main_view`` 与 ``prompt`` 必须传其中一个，可同时传入。
             resolution: 可选，贴图分辨率（如 ``1024``、``2048``）。
@@ -956,7 +1022,7 @@ class VisviseClient:
                 "gen_texture 需要至少提供 input_view.main_view 或 prompt 其中一个"
             )
 
-        cos_url = self._resolve_model_file(model_path, filename=filename)
+        cos_url = self._resolve_model_file(model_path)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.TEXTURE)
         tex_params: dict = {"algorithm_model": resolved_model}
         if resolution is not None:
@@ -993,9 +1059,7 @@ class VisviseClient:
         mesh_category: str = "humanoid",
         name: str = "gen_rigging",
         *,
-        filename: Optional[str] = None,
         template_skeleton: Optional[FileInput] = None,
-        template_skeleton_filename: Optional[str] = None,
     ) -> str:
         """骨骼架设（node_type=5）。
 
@@ -1003,22 +1067,20 @@ class VisviseClient:
 
         Args:
             model_path: 模型文件（.fbx / .obj / .glb）的本地路径、bytes 或 BinaryIO。
-                        ⚠️ 此参数只接受本地文件和二进制内容，不接受 COS URL。
+                ⚠️ 此参数只接受本地文件和二进制内容，不接受 COS URL。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
             algorithm_model: 骨骼架设算法模型名称，可通过
                 :meth:`~visvise.api.VisviseAPI.list_algorithm_model`
                 （node_type=5）获取。例如 ``"VISVISE-GoRigging-V1.0.0"``。
             mesh_category: 模型类别，``"humanoid"``（人形，默认）或 ``"tetrapod"``（四足动物）。
             name: 任务名称。
-            filename: bytes/BinaryIO 输入时指定模型文件名（含扩展名，如 ``model.fbx``）。
             template_skeleton: 模板骨骼，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
                 可选，传入后将基于该模板骨骼进行架设。
-            template_skeleton_filename: template_skeleton 为 bytes/BinaryIO 时指定文件名。
 
         Returns:
             新生成的模型 ID。
         """
         # 1. 构建 JSON 参数
-        import json as _json
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.RIGGING)
         json_data = {
             "config": {
@@ -1028,9 +1090,7 @@ class VisviseClient:
         }
 
         # 2. 组装 zip（兼容裸模型文件和已是 zip 的输入）
-        zip_bytes, zip_filename = self._build_model_zip(
-            model_path, json_data=json_data, filename=filename
-        )
+        zip_bytes, zip_filename = self._build_model_zip(model_path, json_data=json_data)
 
         logger.info("gen_rigging: 上传 %s (%d bytes)", zip_filename, len(zip_bytes))
 
@@ -1038,9 +1098,7 @@ class VisviseClient:
         cos_url = self._resolve_file(zip_bytes, filename=zip_filename)
         go_rigging_params: dict = {"algorithm_model": resolved_model}
         if template_skeleton is not None:
-            go_rigging_params["template_skeleton"] = self._resolve_model_file(
-                template_skeleton, filename=template_skeleton_filename
-            )
+            go_rigging_params["template_skeleton"] = self._resolve_model_file(template_skeleton)
 
         return self.api.gen_3d_model(
             name=name,
@@ -1058,8 +1116,6 @@ class VisviseClient:
         joint_names: list[str],
         algorithm_model: Optional[str] = None,
         name: str = "gen_skinning",
-        *,
-        filename: Optional[str] = None,
     ) -> str:
         """蒙皮生成（node_type=6）。
 
@@ -1067,20 +1123,19 @@ class VisviseClient:
 
         Args:
             model_path: 带骨骼的模型文件（.fbx / .obj / .glb）的本地路径、bytes 或 BinaryIO。
-                        ⚠️ 此参数只接受本地文件和二进制内容，不接受 COS URL。
+                ⚠️ 此参数只接受本地文件和二进制内容，不接受 COS URL。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
             algorithm_model: 蒙皮算法模型名称，可通过
                 :meth:`~visvise.api.VisviseAPI.list_algorithm_model`
                 （node_type=6）获取。例如 ``"VISVISE-GoSkinning-V1.0.0"``。
             mesh_names: 需要蒙皮的网格名称列表，如 ``["Body_Mesh", "Hair_Mesh"]``。
             joint_names: 需要蒙皮的骨骼名称列表，如 ``["Bip001", "Bip001 Pelvis", ...]``。
             name: 任务名称。
-            filename: bytes/BinaryIO 输入时指定模型文件名（含扩展名，如 ``model.fbx``）。
 
         Returns:
             新生成的模型 ID。
         """
         # 1. 构建 JSON 参数
-        import json as _json
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.SKINNING)
         json_data = {
             "config": {
@@ -1093,9 +1148,7 @@ class VisviseClient:
         }
 
         # 2. 组装 zip（兼容裸模型文件和已是 zip 的输入）
-        zip_bytes, zip_filename = self._build_model_zip(
-            model_path, json_data=json_data, filename=filename
-        )
+        zip_bytes, zip_filename = self._build_model_zip(model_path, json_data=json_data)
 
         logger.info("gen_skinning: 上传 %s (%d bytes)", zip_filename, len(zip_bytes))
 
@@ -1118,8 +1171,6 @@ class VisviseClient:
         output_model_format: str = "fbx",
         name: str = "gen_video_motion",
         *,
-        model_filename: Optional[str] = None,
-        video_filename: Optional[str] = None,
         with_hand: Optional[bool] = None,
         multiple_track: Optional[bool] = None,
         rotate_axis_angle: Optional[list[float]] = None,
@@ -1128,11 +1179,12 @@ class VisviseClient:
 
         Args:
             model_path: 模型 zip 包，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名并打包。
             video_path: 驱动视频（非 zip），支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
             algorithm_model: 算法模型（如 ``VISVISE-FramingAI-Base-V1.5.0``）。
             output_model_format: 输出格式，默认 fbx。
             name: 任务名称。
-            model_filename / video_filename: bytes/BinaryIO 时指定对应文件名。
             with_hand: 是否开启手部捕捉。
             multiple_track: 是否开启多人捕捉。
             rotate_axis_angle: 旋转轴角 [x, y, z]（弧度）。
@@ -1140,8 +1192,8 @@ class VisviseClient:
         Returns:
             新生成的模型 ID。
         """
-        model_url = self._resolve_model_file(model_path, filename=model_filename)
-        video_url = self._resolve_file(video_path, filename=video_filename)
+        model_url = self._resolve_model_file(model_path)
+        video_url = self._resolve_file(video_path)
 
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.ANIMATION, sub_type=1)
         framing: dict = {
@@ -1172,8 +1224,6 @@ class VisviseClient:
         algorithm_model: Optional[str] = None,
         output_model_format: str = "fbx",
         name: str = "gen_text_motion",
-        *,
-        filename: Optional[str] = None,
     ) -> list[str]:
         """文本生动画（node_type=4）。
 
@@ -1181,16 +1231,16 @@ class VisviseClient:
 
         Args:
             model_path: 模型 zip 包，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名并打包。
             prompt: 动画提示词（如 "一个人在跳街舞"）。
             algorithm_model: 文生动画模型（如 ``VISVISE-TextMotion-V1.1.0``）。
             output_model_format: 输出格式，默认 fbx。
             name: 任务名称。
-            filename: bytes/BinaryIO 时指定文件名。
 
         Returns:
             4 个新生成的模型 ID 列表（用于抽卡）。
         """
-        model_url = self._resolve_model_file(model_path, filename=filename)
+        model_url = self._resolve_model_file(model_path)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.ANIMATION, sub_type=2)
         return self.api.gen_3d_model(
             name=name,
@@ -1212,30 +1262,23 @@ class VisviseClient:
         algorithm_model: Optional[str] = None,
         output_model_format: str = "fbx",
         name: str = "gen_pose",
-        *,
-        model_filename: Optional[str] = None,
-        image_filenames: Optional[list[Optional[str]]] = None,
     ) -> list[str]:
         """批量图生 Pose（最多 10 张图片）。
 
         Args:
             model_path: FBX 模型 zip 包，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名并打包。
             input_images: 参考图片列表（1~10 个），每个元素支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
             algorithm_model: 算法模型（如 ``VISVISE-PosingAI-V1.0.0``）。
             output_model_format: 输出格式，默认 fbx。
             name: 任务名称。
-            model_filename: model_path 为 bytes/BinaryIO 时指定文件名。
-            image_filenames: 与 input_images 一一对应的文件名列表，元素可为 None。
 
         Returns:
             新生成的模型 ID 列表。
         """
-        model_url = self._resolve_model_file(model_path, filename=model_filename)
-        _fnames = image_filenames or [None] * len(input_images)
-        uploaded_images = [
-            self._resolve_file(img, filename=fname)
-            for img, fname in zip(input_images, _fnames)
-        ]
+        model_url = self._resolve_model_file(model_path)
+        uploaded_images = [self._resolve_file(img) for img in input_images]
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_POSE)
         return self.api.batch_gen_pose(
             name=name,
@@ -1338,4 +1381,3 @@ class VisviseClient:
                 model_id="",
             )
         return new_model_id
-
