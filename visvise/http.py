@@ -127,14 +127,21 @@ class WeaverHTTPClient:
         except requests.exceptions.Timeout as e:
             raise NetworkError(f"请求超时: {e}") from e
         except requests.exceptions.HTTPError as e:
-            raise NetworkError(f"HTTP 错误: {e}") from e
+            # 透出服务端响应体，便于定位（如 {"error":"invalid app_id"} 之类的非标准错误）
+            body_excerpt = (resp.text or "").strip()
+            if len(body_excerpt) > 500:
+                body_excerpt = body_excerpt[:500] + "...(truncated)"
+            extra = f" body={body_excerpt!r}" if body_excerpt else ""
+            raise NetworkError(f"HTTP 错误 [{resp.status_code}]: {e}{extra}") from e
         except requests.exceptions.RequestException as e:
             raise NetworkError(f"请求异常: {e}") from e
 
         try:
             result = resp.json()
         except ValueError as e:
-            raise NetworkError(f"响应解析失败: {resp.text}") from e
+            raise NetworkError(
+                f"响应解析失败 [{resp.status_code}]: body={(resp.text or '')[:500]!r}"
+            ) from e
 
         code = result.get("code", -1)
         req_id = result.get("req_id", "")
@@ -186,6 +193,16 @@ class WeaverHTTPClient:
                 stream=True,
             )
             resp.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            # 透出服务端响应体，便于定位（如 {"error":"invalid app_id"} 等非标准错误）
+            try:
+                body_excerpt = (resp.text or "").strip()
+            except Exception:
+                body_excerpt = ""
+            if len(body_excerpt) > 500:
+                body_excerpt = body_excerpt[:500] + "...(truncated)"
+            extra = f" body={body_excerpt!r}" if body_excerpt else ""
+            raise NetworkError(f"SSE HTTP 错误 [{resp.status_code}]: {e}{extra}") from e
         except requests.exceptions.RequestException as e:
             raise NetworkError(f"SSE 请求异常: {e}") from e
 
