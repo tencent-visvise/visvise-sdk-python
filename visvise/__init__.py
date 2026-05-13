@@ -21,6 +21,7 @@ from .exceptions import (
     QuotaExceededError,
     RateLimitError,
     SignatureError,
+    SignatureExpiredError,
     WeaverError,
 )
 from .models import (
@@ -51,6 +52,7 @@ __all__ = [
     "WeaverError",
     "NetworkError",
     "SignatureError",
+    "SignatureExpiredError",
     "PermissionDeniedError",
     "QuotaExceededError",
     "RateLimitError",

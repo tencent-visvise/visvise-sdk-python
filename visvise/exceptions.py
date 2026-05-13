@@ -30,7 +30,11 @@ class NetworkError(WeaverError):
 
 
 class SignatureError(WeaverError):
-    """签名错误（HTTP 400）"""
+    """签名错误（业务错误码 411）"""
+
+
+class SignatureExpiredError(WeaverError):
+    """签名过期，timestamp 与服务端时间偏差过大（业务错误码 412）"""
 
 
 # ──────────────────────────────────────────────
@@ -108,7 +112,8 @@ class PollingTimeoutError(WeaverError):
 # ──────────────────────────────────────────────
 
 _CODE_TO_EXCEPTION: dict[int, type[WeaverError]] = {
-    400:    SignatureError,
+    411:    SignatureError,
+    412:    SignatureExpiredError,
     120008: InvalidParamsError,
     120017: UserNotFoundError,
     120018: PermissionDeniedError,

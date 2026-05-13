@@ -532,7 +532,8 @@ prompts = client.api.get_text2motion_prompt_list(language="zh")
 |---|---|---|
 | `WeaverError` | 任意 | 基础异常 |
 | `NetworkError` | — | 网络连接失败、超时等 |
-| `SignatureError` | 400 | 签名错误 |
+| `SignatureError` | 411 | 签名错误 |
+| `SignatureExpiredError` | 412 | 签名过期，本地时钟与服务端偏差过大 |
 | `InvalidParamsError` | 120008 | 请求参数错误 |
 | `UserNotFoundError` | 120017 | 用户未找到 |
 | `PermissionDeniedError` | 120018 | 用户无权限 |
