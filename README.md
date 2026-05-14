@@ -1,6 +1,6 @@
 # VISVISE Weaver Python SDK
 
-**[English](README_EN.md)** | 中文
+**中文** | [English](README_EN.md)
 
 VISVISE Weaver OpenAPI 的 Python SDK，提供：
 
