@@ -14,12 +14,12 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
 )
 
-APP_ID     = "vsa_0ba7a1ad201511d6"
-SECRET_KEY = "vss_22667757bee57cbc88abf4d9c04cea716d81251def529779"
-UID        = "p_ck6a498bch7dzu5xn98r8ietii7kwp47sv7mjefyhru283p2wr7pp"
+APP_ID = os.environ["VISVISE_APP_ID"]
+SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
+RTX = os.environ["VISVISE_RTX"]
 ASSETS     = Path(__file__).parent / "assets"
 
-client = VisviseClient(APP_ID, SECRET_KEY, UID, env=Environment.DEV)
+client = VisviseClient(APP_ID, SECRET_KEY, env=Environment.DEV)
 
 
 def read(p): return (ASSETS / p).read_bytes()
@@ -45,7 +45,7 @@ print("=" * 70)
 
 # 0. 先看下账号配额
 try:
-    quota = client.api.get_user_quota()
+    quota = client.api.get_user_quota(rtx=RTX)
     print(f"\n剩余配额: {quota.quota}, 服务器时间戳: {quota.server_ts}\n")
 except Exception as e:
     print(f"\n⚠️  查配额失败: {e}\n")
@@ -54,6 +54,7 @@ except Exception as e:
 run("gen_360 (bytes)", lambda: client.gen_360(
     main_view=read("main_view.png"),
     name="newkey_test_gen_360",
+    rtx=RTX,
 ))
 
 # 2. 图生高模（本地 path）
@@ -62,6 +63,7 @@ run("gen_high_model (path)", lambda: client.gen_high_model(
     output_model_format=OutputModelFormat.FBX,
     face_type=FaceType.TRIANGLE,
     name="newkey_test_gen_high",
+    rtx=RTX,
 ))
 
 # 3. 重拓扑（混元，必须 detail_level）
@@ -71,12 +73,14 @@ run("gen_retopology (path)", lambda: client.gen_retopology(
     face_type=FaceType.QUAD,
     detail_level=DetailLevel.MEDIUM,
     name="newkey_test_gen_retop",
+    rtx=RTX,
 ))
 
 # 4. UV 展开（OBJ bytes）
 run("gen_uv (bytes)", lambda: client.gen_uv(
     model_path=read("tex_model.obj"),
     name="newkey_test_gen_uv",
+    rtx=RTX,
 ))
 
 # 5. 文生动画（一次返回 4 个 ID）
@@ -85,6 +89,7 @@ run("gen_text_motion (bytes + prompt)", lambda: client.gen_text_motion(
     prompt="一个人在跳街舞",
     output_model_format=OutputModelFormat.FBX,
     name="newkey_test_gen_text_motion",
+    rtx=RTX,
 ))
 
 print("\n" + "=" * 70)

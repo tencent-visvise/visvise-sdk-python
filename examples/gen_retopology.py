@@ -15,7 +15,7 @@ from visvise import Environment, VisviseClient, FaceType, DetailLevel, OutputMod
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
-UID        = os.environ["VISVISE_UID"]
+RTX        = os.environ["VISVISE_RTX"]
 ENV        = os.environ.get("VISVISE_ENV", "prod")
 ENV_MAP    = {"prod": Environment.PROD, "test": Environment.TEST, "dev": Environment.DEV}
 
@@ -23,7 +23,7 @@ ASSETS = Path(__file__).parent / "assets"
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, UID, env=ENV_MAP[ENV])  # noqa
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     print("[gen_retopology] 开始重拓扑...")
 
@@ -34,10 +34,11 @@ def main():
         face_type=FaceType.QUAD,
         detail_level=DetailLevel.HIGH,     # 混元模型用 detail_level
         name="example_gen_retopology",
+        rtx=RTX,
     )
     print(f"[gen_retopology] 任务已创建，model_id={model_id}")
 
-    model = client.wait_model(model_id, interval=5, timeout=900)
+    model = client.wait_model(model_id, interval=5, timeout=900, rtx=RTX)
     print(f"[gen_retopology] 生成成功！耗时 {model.time_cost}s")
     print(f"  output_model : {model.output_model}")
 

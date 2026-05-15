@@ -15,7 +15,7 @@ from visvise import Environment, VisviseClient, FaceType, OutputModelFormat
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
-UID        = os.environ["VISVISE_UID"]
+RTX        = os.environ["VISVISE_RTX"]
 ENV        = os.environ.get("VISVISE_ENV", "prod")
 ENV_MAP    = {"prod": Environment.PROD, "test": Environment.TEST, "dev": Environment.DEV}
 
@@ -27,12 +27,12 @@ def strip_sign(url: str) -> str:
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, UID, env=ENV_MAP[ENV])  # noqa
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     mv_model_id = os.environ.get("MV_360_MODEL_ID")
     if mv_model_id:
         print(f"[gen_mid_model] 从 gen_360 输出提取四视图 (model_id={mv_model_id})")
-        models, _ = client.api.get_model_list(model_id_list=[mv_model_id], limit=10)
+        models, _ = client.api.get_model_list(model_id_list=[mv_model_id], limit=10, rtx=RTX)
         out = models[0].image_gen_360_output.output_view
         main_view  = strip_sign(out.main_view)
         back_view  = strip_sign(out.back_view)
@@ -54,10 +54,11 @@ def main():
         output_model_format=OutputModelFormat.FBX,
         face_type=FaceType.TRIANGLE,
         name="example_gen_mid_model",
+        rtx=RTX,
     )
     print(f"[gen_mid_model] 任务已创建，model_id={model_id}")
 
-    model = client.wait_model(model_id, interval=5, timeout=900)
+    model = client.wait_model(model_id, interval=5, timeout=900, rtx=RTX)
     print(f"[gen_mid_model] 生成成功！耗时 {model.time_cost}s")
     print(f"  output_model : {model.output_model}")
 

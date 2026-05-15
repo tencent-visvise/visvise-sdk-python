@@ -16,7 +16,7 @@ from visvise import Environment, VisviseClient
 # ── 从环境变量读取鉴权信息 ──────────────────────────────────────────────
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
-UID        = os.environ["VISVISE_UID"]
+RTX        = os.environ["VISVISE_RTX"]
 ENV        = os.environ.get("VISVISE_ENV", "prod")
 
 ENV_MAP = {"prod": Environment.PROD, "test": Environment.TEST, "dev": Environment.DEV}
@@ -27,7 +27,7 @@ MAIN_VIEW = ASSETS / "main_view.png"
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, UID, env=ENV_MAP[ENV])  # noqa
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     print(f"[gen_360] 开始生成多视图，输入图片：{MAIN_VIEW}")
 
@@ -35,11 +35,12 @@ def main():
         main_view=str(MAIN_VIEW),
         algorithm_model="VISVISE-MultiView-V1.0.0",
         name="example_gen_360",
+        rtx=RTX,
     )
     print(f"[gen_360] 任务已创建，model_id={model_id}")
 
     print("[gen_360] 等待完成...")
-    model = client.wait_model(model_id, interval=3, timeout=300)
+    model = client.wait_model(model_id, interval=3, timeout=300, rtx=RTX)
 
     output = model.image_gen_360_output
     print(f"[gen_360] 生成成功！耗时 {model.time_cost}s")

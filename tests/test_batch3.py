@@ -5,13 +5,13 @@ from visvise import VisviseClient
 
 APP_ID = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
-UID        = os.environ["VISVISE_UID"]
+RTX        = os.environ["VISVISE_RTX"]
 ASSETS = Path(__file__).parent / "assets"
-client = VisviseClient(APP_ID, SECRET_KEY, UID)
+client = VisviseClient(APP_ID, SECRET_KEY)
 
 results = []
 def check(name, mid, expected):
-    m = client.wait_model(mid, interval=5, timeout=900)
+    m = client.wait_model(mid, interval=5, timeout=900, rtx=RTX)
     actual = m.params or {}
     ok, issues = True, []
     for kp, ev in expected.items():
@@ -36,21 +36,25 @@ def run(label, fn):
 # gen_video_motion: with_hand / multiple_track
 run("vm with_hand=True", lambda: check("vm with_hand=True",
     client.gen_video_motion(str(ASSETS/"animation_model.fbx"), str(ASSETS/"animation_video.mp4"),
-        "VISVISE-FramingAI-Base-V1.5.0", with_hand=True, name="opt_vm_a"),
+        "VISVISE-FramingAI-Base-V1.5.0", with_hand=True, name="opt_vm_a",
+        rtx=RTX,),
     {"framing_ai_params.with_hand": True}))
 run("vm hand=False multi=False", lambda: check("vm hand=False multi=False",
     client.gen_video_motion(str(ASSETS/"animation_model.fbx"), str(ASSETS/"animation_video.mp4"),
-        "VISVISE-FramingAI-Base-V1.5.0", with_hand=False, multiple_track=False, name="opt_vm_b"),
+        "VISVISE-FramingAI-Base-V1.5.0", with_hand=False, multiple_track=False, name="opt_vm_b",
+        rtx=RTX,),
     {"framing_ai_params.with_hand": False, "framing_ai_params.multiple_track": False}))
 
 # gen_text_motion: prompt content
 run("tm prompt=挥手", lambda: check("tm prompt=挥手",
     client.gen_text_motion(str(ASSETS/"animation_model.fbx"), "一个人在挥手打招呼",
-        "VISVISE-TextMotion-V1.1.0", name="opt_tm_a")[0],
+        "VISVISE-TextMotion-V1.1.0", name="opt_tm_a",
+        rtx=RTX,)[0],
     {"framing_ai_params.prompt": "一个人在挥手打招呼"}))
 run("tm prompt=踏步 glb", lambda: check("tm prompt=踏步 glb",
     client.gen_text_motion(str(ASSETS/"animation_model.fbx"), "一个人在原地踏步",
-        "VISVISE-TextMotion-V1.1.0", output_model_format="glb", name="opt_tm_b")[0],
+        "VISVISE-TextMotion-V1.1.0", output_model_format="glb", name="opt_tm_b",
+        rtx=RTX,)[0],
     {"framing_ai_params.prompt": "一个人在原地踏步",
      "framing_ai_params.output_model_format": "glb"}))
 

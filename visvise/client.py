@@ -171,31 +171,38 @@ class VisviseClient:
         from visvise import VisviseClient, Environment
 
         # 线上生产环境（默认）
-        client = VisviseClient(app_id="your_app_id", secret_key="your_key", uid="your_uid")
+        client = VisviseClient(app_id="your_app_id", secret_key="your_key")
 
         # 测试环境
-        client = VisviseClient("app_id", "key", "uid", env=Environment.TEST)
+        client = VisviseClient("app_id", "key", env=Environment.TEST)
 
         # 开发环境
-        client = VisviseClient("app_id", "key", "uid", env=Environment.DEV)
+        client = VisviseClient("app_id", "key", env=Environment.DEV)
 
         # 自定义域名（如代理）
-        client = VisviseClient("app_id", "key", "uid", env="https://my-proxy.example.com")
+        client = VisviseClient("app_id", "key", env="https://my-proxy.example.com")
 
-        # 高阶方法：自动上传文件 + 创建任务，返回 model_id
+        # 调用任意接口都需要传 rtx（实际使用人的 RTX 公司账号）
         model_id = client.gen_360(
             main_view="/path/to/character.png",
+            rtx="caller_rtx",
             algorithm_model="hunyuan3D-MultiView-v3.0",
         )
 
         # 等待完成
-        model = client.wait_model(model_id)
+        model = client.wait_model(model_id, rtx="caller_rtx")
         print(model.output_model)
+
+    .. note::
+
+       签名 header 中的 ``rtx`` 表示**实际使用人**的 RTX（公司账号）。
+       按公司要求，**内部用户必须传实际使用人的 rtx**，不可用项目账号或共享账号代填；
+       外部用户可传业务标识。``rtx`` 为请求级字段，每次方法调用单独传入，**不在
+       client 初始化时绑定**。
 
     Args:
         app_id: 由平台分配的客户端标识。
         secret_key: 由平台分配的签名密钥。
-        uid: 用户 ID，从申请 key 的登录账号获取。当前一期未做严格校验，但必须传入；二期将做严格校验。
         env: 环境配置，支持 :class:`~visvise.http.Environment` 枚举或自定义 URL 字符串。
              默认 :attr:`~visvise.http.Environment.PROD`（线上生产环境）。
         timeout: 单次 HTTP 请求超时（秒），默认 30。
@@ -205,14 +212,12 @@ class VisviseClient:
         self,
         app_id: str,
         secret_key: str,
-        uid: str,
         env: str | Environment = Environment.PROD,
         timeout: int = 30,
     ):
         self._http = WeaverHTTPClient(
             app_id=app_id,
             secret_key=secret_key,
-            uid=uid,
             base_url=env,
             timeout=timeout,
         )
@@ -225,6 +230,8 @@ class VisviseClient:
     def _resolve_file(
         self,
         source: FileInput,
+        *,
+        rtx: str,
         filename: Optional[str] = None,
         is_temp: bool = False,
     ) -> str:
@@ -242,6 +249,7 @@ class VisviseClient:
 
         Args:
             source: 文件输入，支持本地路径 / bytes / BinaryIO。
+            rtx: 实际使用人的 RTX，用于调用 get_cos_cred 接口。
             filename: 内部使用的文件名（含扩展名）。bytes/BinaryIO 输入时若不传则自动用 uuid 生成。
             is_temp: 是否临时文件（7天后自动删除）。
 
@@ -269,7 +277,7 @@ class VisviseClient:
                 "文件上传需要安装 cos-python-sdk-v5：pip install cos-python-sdk-v5"
             ) from e
 
-        cred: GetCosCredResult = self.api.get_cos_cred(is_temp=is_temp)
+        cred: GetCosCredResult = self.api.get_cos_cred(rtx=rtx, is_temp=is_temp)
         config = CosConfig(
             Region=cred.region,
             SecretId=cred.cred.tmp_secret_id,
@@ -309,8 +317,8 @@ class VisviseClient:
         return cos_url
 
     # 向后兼容别名
-    def _upload_file(self, source: FileInput, filename: Optional[str] = None, is_temp: bool = False) -> str:
-        return self._resolve_file(source, filename=filename, is_temp=is_temp)
+    def _upload_file(self, source: FileInput, *, rtx: str, filename: Optional[str] = None, is_temp: bool = False) -> str:
+        return self._resolve_file(source, rtx=rtx, filename=filename, is_temp=is_temp)
 
     # ══════════════════════════════════════════════════════════════════════
     # 模型 zip 构建工具（骨骼架设 / 蒙皮共用）
@@ -425,6 +433,8 @@ class VisviseClient:
     def _resolve_model_file(
         self,
         source: FileInput,
+        *,
+        rtx: str,
         is_temp: bool = False,
     ) -> str:
         """上传模型文件到 COS，自动处理 zip 打包逻辑。
@@ -441,6 +451,7 @@ class VisviseClient:
                 - 本地路径（str）
                 - VISVISE 平台 COS URL（str，必须是本平台上传所得地址）
                 - bytes 或 BinaryIO（二进制内容）
+            rtx: 实际使用人的 RTX。
             is_temp: 是否临时文件。
 
         Returns:
@@ -468,10 +479,10 @@ class VisviseClient:
                 zip_bytes = _wrap_in_zip(raw, base)
                 zip_name = f"{stem}.zip"
                 logger.info("自动打包 %s → %s 后上传", base, zip_name)
-                return self._resolve_file(zip_bytes, filename=zip_name, is_temp=is_temp)
+                return self._resolve_file(zip_bytes, rtx=rtx, filename=zip_name, is_temp=is_temp)
             else:
                 # .zip 或其他格式，直接上传
-                return self._resolve_file(source, is_temp=is_temp)
+                return self._resolve_file(source, rtx=rtx, is_temp=is_temp)
 
         # ── bytes / BinaryIO：读取内容 ──
         if isinstance(source, (bytes, bytearray)):
@@ -483,7 +494,7 @@ class VisviseClient:
         if _is_zip_bytes(raw):
             _fname = _gen_random_filename(".zip")
             logger.debug("内容已是 zip 格式，直接上传：%s", _fname)
-            return self._resolve_file(raw, filename=_fname, is_temp=is_temp)
+            return self._resolve_file(raw, rtx=rtx, filename=_fname, is_temp=is_temp)
 
         # 非 zip：嗅探扩展名（fbx/obj/glb 等），无法识别时回退 .fbx 后打包
         inner_name = _gen_random_filename_for(raw, default_ext=".fbx")
@@ -492,7 +503,7 @@ class VisviseClient:
 
         zip_bytes = _wrap_in_zip(raw, inner_name)
         logger.info("自动打包二进制内容（%d bytes）→ %s 后上传", len(raw), zip_name)
-        return self._resolve_file(zip_bytes, filename=zip_name, is_temp=is_temp)
+        return self._resolve_file(zip_bytes, rtx=rtx, filename=zip_name, is_temp=is_temp)
 
     # ══════════════════════════════════════════════════════════════════════
     # wait_model —— 轮询等待模型完成
@@ -501,6 +512,8 @@ class VisviseClient:
     def wait_model(
         self,
         model_id: str,
+        *,
+        rtx: str,
         interval: float = 2.0,
         timeout: int = 600,
     ) -> ModelInfo:
@@ -508,6 +521,7 @@ class VisviseClient:
 
         Args:
             model_id: 要等待的模型 ID。
+            rtx: 实际使用人的 RTX。**必填**。
             interval: 轮询间隔（秒），默认 2s。
             timeout: 超时时长（秒），默认 600s（10分钟）。
 
@@ -529,7 +543,7 @@ class VisviseClient:
                 raise PollingTimeoutError(model_id, timeout)
 
             try:
-                models, _ = self.api.get_model_list(model_id_list=[model_id], limit=10)
+                models, _ = self.api.get_model_list(rtx=rtx, model_id_list=[model_id], limit=10)
             except InvalidParamsError:
                 # 参数错误无法靠重试恢复，直接抛出
                 raise
@@ -586,6 +600,8 @@ class VisviseClient:
         algorithm_model: Optional[str],
         node_type: int,
         sub_type: Optional[int] = None,
+        *,
+        rtx: str,
     ) -> str:
         """解析算法模型名称：若已传则直接返回，否则自动获取用户可用的第一个模型。
 
@@ -593,6 +609,7 @@ class VisviseClient:
             algorithm_model: 用户指定的算法模型名称，可为 None。
             node_type: 节点类型（用于查询可用模型列表）。
             sub_type: 子类型（仅 node_type=4 时使用）。
+            rtx: 实际使用人的 RTX。
 
         Returns:
             算法模型名称。
@@ -604,7 +621,7 @@ class VisviseClient:
         if algorithm_model:
             return algorithm_model
 
-        models = self.api.list_algorithm_model(node_type=node_type, sub_type=sub_type)
+        models = self.api.list_algorithm_model(node_type=node_type, sub_type=sub_type, rtx=rtx)
         if not models or len(models) == 0:
             raise ValueError(
                 f"当前账号在 node_type={node_type} 下无可用的算法模型，"
@@ -627,6 +644,7 @@ class VisviseClient:
         algorithm_model: Optional[str] = None,
         name: str = "gen_360",
         *,
+        rtx: str,
         enable_a_pose: Optional[bool] = None,
         style: Optional[str] = None,
         back_view: Optional[FileInput] = None,
@@ -666,12 +684,12 @@ class VisviseClient:
                 f"请使用 ImageGen360Style 枚举常量。"
             )
         view = View(
-            main_view=self._resolve_file(main_view),
-            back_view=self._resolve_file(back_view) if back_view is not None else None,
-            left_view=self._resolve_file(left_view) if left_view is not None else None,
-            right_view=self._resolve_file(right_view) if right_view is not None else None,
+            main_view=self._resolve_file(main_view, rtx=rtx),
+            back_view=self._resolve_file(back_view, rtx=rtx) if back_view is not None else None,
+            left_view=self._resolve_file(left_view, rtx=rtx) if left_view is not None else None,
+            right_view=self._resolve_file(right_view, rtx=rtx) if right_view is not None else None,
         )
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_360)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_360, rtx=rtx)
         img360: dict = {"algorithm_model": resolved_model}
         if enable_a_pose is not None:
             img360["enable_a_pose"] = enable_a_pose
@@ -682,6 +700,7 @@ class VisviseClient:
             name=name,
             input_view=view,
             params={"image_gen_360_params": img360},
+        rtx=rtx,
         )
 
     # ── 3.2 图生高模 ─────────────────────────────────────────────────────
@@ -694,6 +713,7 @@ class VisviseClient:
         face_type: int = 1,
         name: str = "gen_high_model",
         *,
+        rtx: str,
         face_num: Optional[int] = None,
         back_view: Optional[FileInput] = None,
         left_view: Optional[FileInput] = None,
@@ -716,12 +736,12 @@ class VisviseClient:
             新生成的模型 ID。
         """
         view = View(
-            main_view=self._resolve_file(main_view),
-            back_view=self._resolve_file(back_view) if back_view is not None else None,
-            left_view=self._resolve_file(left_view) if left_view is not None else None,
-            right_view=self._resolve_file(right_view) if right_view is not None else None,
+            main_view=self._resolve_file(main_view, rtx=rtx),
+            back_view=self._resolve_file(back_view, rtx=rtx) if back_view is not None else None,
+            left_view=self._resolve_file(left_view, rtx=rtx) if left_view is not None else None,
+            right_view=self._resolve_file(right_view, rtx=rtx) if right_view is not None else None,
         )
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_HIGH)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_HIGH, rtx=rtx)
         img_params: dict = {
             "algorithm_model": resolved_model,
             "output_model_format": output_model_format,
@@ -735,6 +755,7 @@ class VisviseClient:
             node_type=NodeType.IMG_TO_3D_HIGH,
             params={"image_gen_model_params": img_params},
             input_view=view,
+        rtx=rtx,
         )[0]
 
     # ── 3.3 图生中模 ─────────────────────────────────────────────────────
@@ -750,6 +771,7 @@ class VisviseClient:
         face_type: int = 1,
         name: str = "gen_mid_model",
         *,
+        rtx: str,
         segment_model_id: Optional[str] = None,
     ) -> str:
         """图生中模（node_type=11）。
@@ -770,12 +792,12 @@ class VisviseClient:
             新生成的模型 ID。
         """
         view = View(
-            main_view=self._resolve_file(main_view),
-            back_view=self._resolve_file(back_view),
-            left_view=self._resolve_file(left_view),
-            right_view=self._resolve_file(right_view),
+            main_view=self._resolve_file(main_view, rtx=rtx),
+            back_view=self._resolve_file(back_view, rtx=rtx),
+            left_view=self._resolve_file(left_view, rtx=rtx),
+            right_view=self._resolve_file(right_view, rtx=rtx),
         )
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_MID)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_MID, rtx=rtx)
         img_params: dict = {
             "algorithm_model": resolved_model,
             "output_model_format": output_model_format,
@@ -788,6 +810,7 @@ class VisviseClient:
             node_type=NodeType.IMG_TO_3D_MID,
             params={"image_gen_model_params": img_params},
             input_view=view,
+        rtx=rtx,
         )[0]
 
     # ── 3.4 图生低模 ─────────────────────────────────────────────────────
@@ -800,6 +823,7 @@ class VisviseClient:
         face_type: int = 1,
         name: str = "gen_low_model",
         *,
+        rtx: str,
         back_view: Optional[FileInput] = None,
         left_view: Optional[FileInput] = None,
         right_view: Optional[FileInput] = None,
@@ -814,12 +838,12 @@ class VisviseClient:
             back_view / left_view / right_view: 可选额外视图。
         """
         view = View(
-            main_view=self._resolve_file(main_view),
-            back_view=self._resolve_file(back_view) if back_view is not None else None,
-            left_view=self._resolve_file(left_view) if left_view is not None else None,
-            right_view=self._resolve_file(right_view) if right_view is not None else None,
+            main_view=self._resolve_file(main_view, rtx=rtx),
+            back_view=self._resolve_file(back_view, rtx=rtx) if back_view is not None else None,
+            left_view=self._resolve_file(left_view, rtx=rtx) if left_view is not None else None,
+            right_view=self._resolve_file(right_view, rtx=rtx) if right_view is not None else None,
         )
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_LOW)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_LOW, rtx=rtx)
         img_params: dict = {
             "algorithm_model": resolved_model,
             "output_model_format": output_model_format,
@@ -830,6 +854,7 @@ class VisviseClient:
             node_type=NodeType.IMG_TO_3D_LOW,
             params={"image_gen_model_params": img_params},
             input_view=view,
+        rtx=rtx,
         )[0]
 
     # ── 3.5 重布线 ───────────────────────────────────────────────────────
@@ -841,6 +866,7 @@ class VisviseClient:
         input_model_format: str = "fbx",
         name: str = "gen_mesh_refine",
         *,
+        rtx: str,
         mode: Optional[int] = None,
         color_model: Optional[FileInput] = None,
     ) -> str:
@@ -857,8 +883,8 @@ class VisviseClient:
             color_model: 带颜色的模型，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
                 传入后将为输出模型附加颜色信息。
         """
-        cos_url = self._resolve_model_file(model_path)
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.MESH_REFINE)
+        cos_url = self._resolve_model_file(model_path, rtx=rtx)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.MESH_REFINE, rtx=rtx)
         params: dict = {
             "algorithm_model": resolved_model,
             "input_model_format": input_model_format,
@@ -866,13 +892,14 @@ class VisviseClient:
         if mode is not None:
             params["mode"] = mode
         if color_model is not None:
-            params["color_model"] = self._resolve_model_file(color_model)
+            params["color_model"] = self._resolve_model_file(color_model, rtx=rtx)
 
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.MESH_REFINE,
             params={"mesh_refine_params": params},
             input_model=cos_url,
+        rtx=rtx,
         )[0]
 
     # ── 3.6 重拓扑 ───────────────────────────────────────────────────────
@@ -885,6 +912,7 @@ class VisviseClient:
         face_type: int = 2,
         name: str = "gen_retopology",
         *,
+        rtx: str,
         detail_level: Optional[int] = None,
         face_num: Optional[int] = None,
     ) -> str:
@@ -904,8 +932,8 @@ class VisviseClient:
         Note:
             ``detail_level`` 和 ``face_num`` 根据算法模型二选一。
         """
-        cos_url = self._resolve_model_file(model_path)
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.RE_TOPOLOGY)
+        cos_url = self._resolve_model_file(model_path, rtx=rtx)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.RE_TOPOLOGY, rtx=rtx)
         params: dict = {
             "algorithm_model": resolved_model,
             "output_model_format": output_model_format,
@@ -921,6 +949,7 @@ class VisviseClient:
             node_type=NodeType.RE_TOPOLOGY,
             params={"re_topology_params": params},
             input_model=cos_url,
+        rtx=rtx,
         )[0]
 
     # ── 3.7 LOD ──────────────────────────────────────────────────────────
@@ -933,6 +962,7 @@ class VisviseClient:
         output_model_format: str = "fbx",
         name: str = "gen_lod",
         *,
+        rtx: str,
         gen_times: int = 3,
     ) -> list[str]:
         """LOD 减面（node_type=2）。
@@ -950,8 +980,8 @@ class VisviseClient:
         Returns:
             模型 ID 列表（gen_times=3 时返回 3 个 ID）。
         """
-        cos_url = self._resolve_model_file(model_path)
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.LOD)
+        cos_url = self._resolve_model_file(model_path, rtx=rtx)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.LOD, rtx=rtx)
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.LOD,
@@ -962,6 +992,7 @@ class VisviseClient:
                 "gen_times": gen_times,
             }},
             input_model=cos_url,
+        rtx=rtx,
         )
 
     # ── 3.8 UV 展开 ───────────────────────────────────────────────────────
@@ -972,6 +1003,7 @@ class VisviseClient:
         algorithm_model: Optional[str] = None,
         name: str = "gen_uv",
         *,
+        rtx: str,
         enable_auto_smoothing: Optional[bool] = None,
     ) -> str:
         """UV 展开（node_type=9）。
@@ -986,8 +1018,8 @@ class VisviseClient:
         Returns:
             新生成的模型 ID。
         """
-        cos_url = self._resolve_model_file(model_path)
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.UV)
+        cos_url = self._resolve_model_file(model_path, rtx=rtx)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.UV, rtx=rtx)
         uv_params: dict = {"algorithm_model": resolved_model}
         if enable_auto_smoothing is not None:
             uv_params["enable_auto_smoothing"] = enable_auto_smoothing
@@ -997,6 +1029,7 @@ class VisviseClient:
             node_type=NodeType.UV,
             params={"uv_params": uv_params},
             input_model=cos_url,
+        rtx=rtx,
         )[0]
 
     # ── 3.9 贴图纹理 ─────────────────────────────────────────────────────
@@ -1007,6 +1040,7 @@ class VisviseClient:
         algorithm_model: Optional[str] = None,
         name: str = "gen_texture",
         *,
+        rtx: str,
         input_view: Optional[View] = None,
         resolution: Optional[int] = None,
         unwarp_uv: Optional[bool] = None,
@@ -1037,8 +1071,8 @@ class VisviseClient:
                 "gen_texture 需要至少提供 input_view.main_view 或 prompt 其中一个"
             )
 
-        cos_url = self._resolve_model_file(model_path)
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.TEXTURE)
+        cos_url = self._resolve_model_file(model_path, rtx=rtx)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.TEXTURE, rtx=rtx)
         tex_params: dict = {"algorithm_model": resolved_model}
         if resolution is not None:
             tex_params["resolution"] = resolution
@@ -1051,10 +1085,10 @@ class VisviseClient:
         resolved_view: Optional[View] = None
         if input_view is not None:
             resolved_view = View(
-                main_view=self._resolve_file(input_view.main_view) if input_view.main_view else input_view.main_view,
-                back_view=self._resolve_file(input_view.back_view) if input_view.back_view else None,
-                left_view=self._resolve_file(input_view.left_view) if input_view.left_view else None,
-                right_view=self._resolve_file(input_view.right_view) if input_view.right_view else None,
+                main_view=self._resolve_file(input_view.main_view, rtx=rtx) if input_view.main_view else input_view.main_view,
+                back_view=self._resolve_file(input_view.back_view, rtx=rtx) if input_view.back_view else None,
+                left_view=self._resolve_file(input_view.left_view, rtx=rtx) if input_view.left_view else None,
+                right_view=self._resolve_file(input_view.right_view, rtx=rtx) if input_view.right_view else None,
             )
 
         return self.api.gen_3d_model(
@@ -1063,6 +1097,7 @@ class VisviseClient:
             params={"tex_params": tex_params},
             input_model=cos_url,
             input_view=resolved_view,
+        rtx=rtx,
         )[0]
 
     # ── 4.2 骨骼架设 ─────────────────────────────────────────────────────
@@ -1074,6 +1109,7 @@ class VisviseClient:
         mesh_category: str = "humanoid",
         name: str = "gen_rigging",
         *,
+        rtx: str,
         template_skeleton: Optional[FileInput] = None,
     ) -> str:
         """骨骼架设（node_type=5）。
@@ -1096,7 +1132,7 @@ class VisviseClient:
             新生成的模型 ID。
         """
         # 1. 构建 JSON 参数
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.RIGGING)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.RIGGING, rtx=rtx)
         json_data = {
             "config": {
                 "mesh_category": mesh_category,
@@ -1110,16 +1146,17 @@ class VisviseClient:
         logger.info("gen_rigging: 上传 %s (%d bytes)", zip_filename, len(zip_bytes))
 
         # 3. 上传并创建任务
-        cos_url = self._resolve_file(zip_bytes, filename=zip_filename)
+        cos_url = self._resolve_file(zip_bytes, filename=zip_filename, rtx=rtx)
         go_rigging_params: dict = {"algorithm_model": resolved_model}
         if template_skeleton is not None:
-            go_rigging_params["template_skeleton"] = self._resolve_model_file(template_skeleton)
+            go_rigging_params["template_skeleton"] = self._resolve_model_file(template_skeleton, rtx=rtx)
 
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.RIGGING,
             params={"go_rigging_params": go_rigging_params},
             input_model=cos_url,
+        rtx=rtx,
         )[0]
 
     # ── 4.3 蒙皮生成 ─────────────────────────────────────────────────────
@@ -1131,6 +1168,8 @@ class VisviseClient:
         joint_names: list[str],
         algorithm_model: Optional[str] = None,
         name: str = "gen_skinning",
+        *,
+        rtx: str,
     ) -> str:
         """蒙皮生成（node_type=6）。
 
@@ -1151,7 +1190,7 @@ class VisviseClient:
             新生成的模型 ID。
         """
         # 1. 构建 JSON 参数
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.SKINNING)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.SKINNING, rtx=rtx)
         json_data = {
             "config": {
                 "algo_name": resolved_model,
@@ -1168,12 +1207,13 @@ class VisviseClient:
         logger.info("gen_skinning: 上传 %s (%d bytes)", zip_filename, len(zip_bytes))
 
         # 3. 上传并创建任务
-        cos_url = self._resolve_file(zip_bytes, filename=zip_filename)
+        cos_url = self._resolve_file(zip_bytes, filename=zip_filename, rtx=rtx)
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.SKINNING,
             params={},
             input_model=cos_url,
+        rtx=rtx,
         )[0]
 
     # ── 4.4.1 视频生动画 ─────────────────────────────────────────────────
@@ -1186,6 +1226,7 @@ class VisviseClient:
         output_model_format: str = "fbx",
         name: str = "gen_video_motion",
         *,
+        rtx: str,
         with_hand: Optional[bool] = None,
         multiple_track: Optional[bool] = None,
         rotate_axis_angle: Optional[list[float]] = None,
@@ -1207,10 +1248,10 @@ class VisviseClient:
         Returns:
             新生成的模型 ID。
         """
-        model_url = self._resolve_model_file(model_path)
-        video_url = self._resolve_file(video_path)
+        model_url = self._resolve_model_file(model_path, rtx=rtx)
+        video_url = self._resolve_file(video_path, rtx=rtx)
 
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.ANIMATION, sub_type=1)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.ANIMATION, sub_type=1, rtx=rtx)
         framing: dict = {
             "algorithm_model": resolved_model,
             "output_model_format": output_model_format,
@@ -1228,6 +1269,7 @@ class VisviseClient:
             params={"framing_ai_params": framing},
             input_model=model_url,
             input_video=video_url,
+        rtx=rtx,
         )[0]
 
     # ── 4.4.2 文本生动画 ─────────────────────────────────────────────────
@@ -1239,6 +1281,8 @@ class VisviseClient:
         algorithm_model: Optional[str] = None,
         output_model_format: str = "fbx",
         name: str = "gen_text_motion",
+        *,
+        rtx: str,
     ) -> list[str]:
         """文本生动画（node_type=4）。
 
@@ -1255,8 +1299,8 @@ class VisviseClient:
         Returns:
             4 个新生成的模型 ID 列表（用于抽卡）。
         """
-        model_url = self._resolve_model_file(model_path)
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.ANIMATION, sub_type=2)
+        model_url = self._resolve_model_file(model_path, rtx=rtx)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.ANIMATION, sub_type=2, rtx=rtx)
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.ANIMATION,
@@ -1266,6 +1310,7 @@ class VisviseClient:
                 "prompt": prompt,
             }},
             input_model=model_url,
+        rtx=rtx,
         )
 
     # ── 4.5 图生 Pose ─────────────────────────────────────────────────────
@@ -1277,6 +1322,8 @@ class VisviseClient:
         algorithm_model: Optional[str] = None,
         output_model_format: str = "fbx",
         name: str = "gen_pose",
+        *,
+        rtx: str,
     ) -> list[str]:
         """批量图生 Pose（最多 10 张图片）。
 
@@ -1292,9 +1339,9 @@ class VisviseClient:
         Returns:
             新生成的模型 ID 列表。
         """
-        model_url = self._resolve_model_file(model_path)
-        uploaded_images = [self._resolve_file(img) for img in input_images]
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_POSE)
+        model_url = self._resolve_model_file(model_path, rtx=rtx)
+        uploaded_images = [self._resolve_file(img, rtx=rtx) for img in input_images]
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_POSE, rtx=rtx)
         return self.api.batch_gen_pose(
             name=name,
             input_model=model_url,
@@ -1303,6 +1350,7 @@ class VisviseClient:
                 "algorithm_model": resolved_model,
                 "output_model_format": output_model_format,
             },
+        rtx=rtx,
         )
 
     # ── 4.1 2D 拆分 ─────────────────────────────────────────────────────
@@ -1313,6 +1361,7 @@ class VisviseClient:
         algorithm_model: Optional[str] = None,
         name: str = "gen_segment_2d",
         *,
+        rtx: str,
         input_view: Optional[View] = None,
         split_type: Optional[int] = None,
         granularity: Optional[int] = None,
@@ -1349,13 +1398,13 @@ class VisviseClient:
         resolved_view: Optional[View] = None
         if input_view is not None:
             resolved_view = View(
-                main_view=self._resolve_file(input_view.main_view) if input_view.main_view else input_view.main_view,
-                back_view=self._resolve_file(input_view.back_view) if input_view.back_view else None,
-                left_view=self._resolve_file(input_view.left_view) if input_view.left_view else None,
-                right_view=self._resolve_file(input_view.right_view) if input_view.right_view else None,
+                main_view=self._resolve_file(input_view.main_view, rtx=rtx) if input_view.main_view else input_view.main_view,
+                back_view=self._resolve_file(input_view.back_view, rtx=rtx) if input_view.back_view else None,
+                left_view=self._resolve_file(input_view.left_view, rtx=rtx) if input_view.left_view else None,
+                right_view=self._resolve_file(input_view.right_view, rtx=rtx) if input_view.right_view else None,
             )
 
-        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.SEGMENT_2D)
+        resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.SEGMENT_2D, rtx=rtx)
 
         new_model_id: Optional[str] = None
         for frame in self.api.init_segment(
@@ -1366,6 +1415,7 @@ class VisviseClient:
             split_type=split_type,
             granularity=granularity,
             prompt=prompt,
+        rtx=rtx,
         ):
             event = frame.get("event")
             data = frame.get("data")

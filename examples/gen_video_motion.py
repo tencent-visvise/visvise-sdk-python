@@ -14,7 +14,7 @@ from visvise import Environment, VisviseClient, OutputModelFormat
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
-UID        = os.environ["VISVISE_UID"]
+RTX        = os.environ["VISVISE_RTX"]
 ENV        = os.environ.get("VISVISE_ENV", "prod")
 ENV_MAP    = {"prod": Environment.PROD, "test": Environment.TEST, "dev": Environment.DEV}
 
@@ -22,7 +22,7 @@ ASSETS = Path(__file__).parent / "assets"
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, UID, env=ENV_MAP[ENV])  # noqa
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     print("[gen_video_motion] 开始视频生动画...")
 
@@ -33,10 +33,11 @@ def main():
         output_model_format=OutputModelFormat.FBX,
         with_hand=True,
         name="example_gen_video_motion",
+        rtx=RTX,
     )
     print(f"[gen_video_motion] 任务已创建，model_id={model_id}")
 
-    model = client.wait_model(model_id, interval=5, timeout=900)
+    model = client.wait_model(model_id, interval=5, timeout=900, rtx=RTX)
     print(f"[gen_video_motion] 生成成功！耗时 {model.time_cost}s")
     print(f"  output_model : {model.output_model}")
 

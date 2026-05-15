@@ -2,6 +2,8 @@
 VISVISE Weaver SDK - 原子 API 方法
 
 每个方法对应文档中一个具体接口，失败时根据错误码抛出对应异常。
+
+所有方法都需要传入 ``rtx`` 参数（实际使用人的 RTX 公司账号）。
 """
 
 from __future__ import annotations
@@ -25,6 +27,9 @@ class VisviseAPI:
     """VISVISE Weaver 全部原子接口。
 
     通常不直接使用此类，而是通过 :class:`~visvise.client.VisviseClient` 访问。
+
+    所有方法均需要传入 ``rtx`` 参数（实际使用人的 RTX 公司账号）。
+    按照公司要求，**内部用户必须传实际使用人的 rtx**，不可代填。
     """
 
     def __init__(self, http: WeaverHTTPClient):
@@ -34,10 +39,11 @@ class VisviseAPI:
     # 2.2  获取文件上传临时凭证
     # ──────────────────────────────────────────────────────────────────────
 
-    def get_cos_cred(self, is_temp: bool = False) -> GetCosCredResult:
+    def get_cos_cred(self, *, rtx: str, is_temp: bool = False) -> GetCosCredResult:
         """获取 COS 临时密钥，用于客户端直传文件。
 
         Args:
+            rtx: 实际使用人的 RTX（公司账号）。**必填**。
             is_temp: 是否临时文件（7天后自动删除）。无特殊情况请保持 False。
 
         Returns:
@@ -51,6 +57,7 @@ class VisviseAPI:
         data = self._http.post(
             "openapi/weaver/resource/get_cos_cred",
             body,
+            rtx=rtx,
         )
         return GetCosCredResult.from_dict(data)
 
@@ -58,8 +65,11 @@ class VisviseAPI:
     # 2.3  获取用户剩余生成次数
     # ──────────────────────────────────────────────────────────────────────
 
-    def get_user_quota(self) -> UserQuota:
+    def get_user_quota(self, *, rtx: str) -> UserQuota:
         """获取当前 API Key 当日剩余生成次数。
+
+        Args:
+            rtx: 实际使用人的 RTX。**必填**。
 
         Returns:
             :class:`~visvise.models.UserQuota`
@@ -67,7 +77,7 @@ class VisviseAPI:
         Raises:
             WeaverError / 子类: 接口错误
         """
-        data = self._http.post("openapi/weaver/resource/get_user_quota", {})
+        data = self._http.post("openapi/weaver/resource/get_user_quota", {}, rtx=rtx)
         return UserQuota.from_dict(data)
 
     # ──────────────────────────────────────────────────────────────────────
@@ -80,6 +90,7 @@ class VisviseAPI:
         node_type: int,
         params: dict,
         *,
+        rtx: str,
         input_view: Optional[View] = None,
         input_model: Optional[str] = None,
         input_model_format: Optional[str] = None,
@@ -91,6 +102,7 @@ class VisviseAPI:
             name: 模型资产名称。
             node_type: 节点类型，参考 :class:`~visvise.models.NodeType`。
             params: TemplateParams 字典，根据 node_type 填写对应子结构。
+            rtx: 实际使用人的 RTX。**必填**。
             input_view: 原画视图（图生360/图生模/贴图节点必传）。
             input_model: 模型 COS 地址（zip 文件）。
             input_model_format: 模型格式 fbx/obj/glb。
@@ -116,7 +128,7 @@ class VisviseAPI:
         if input_video is not None:
             body["input_video"] = input_video
 
-        data = self._http.post("openapi/weaver/resource/gen_3d_model", body)
+        data = self._http.post("openapi/weaver/resource/gen_3d_model", body, rtx=rtx)
         return data["model_ids"]
 
     # ──────────────────────────────────────────────────────────────────────
@@ -128,6 +140,8 @@ class VisviseAPI:
         name: str,
         input_view: View,
         params: dict,
+        *,
+        rtx: str,
     ) -> str:
         """从单张图生成多视图（异步）。
 
@@ -135,6 +149,7 @@ class VisviseAPI:
             name: 任务名称。
             input_view: 输入视图，至少包含 main_view。
             params: TemplateParams，需填写 image_gen_360_params。
+            rtx: 实际使用人的 RTX。**必填**。
 
         Returns:
             新生成的模型 ID。
@@ -147,7 +162,7 @@ class VisviseAPI:
             "input_view": input_view.to_dict(),
             "params": params,
         }
-        data = self._http.post("openapi/weaver/resource/gen_multi_views", body)
+        data = self._http.post("openapi/weaver/resource/gen_multi_views", body, rtx=rtx)
         return data["model_id"]
 
     # ──────────────────────────────────────────────────────────────────────
@@ -157,6 +172,7 @@ class VisviseAPI:
     def get_model_list(
         self,
         *,
+        rtx: str,
         model_id_list: Optional[list[str]] = None,
         node_type_list: Optional[list[int]] = None,
         status_list: Optional[list[int]] = None,
@@ -166,6 +182,10 @@ class VisviseAPI:
         sorter: Optional[dict] = None,
     ) -> tuple[list[ModelInfo], int]:
         """拉取模型资产列表。
+
+        Args:
+            rtx: 实际使用人的 RTX。**必填**。
+            其它: 见参数说明。
 
         Returns:
             (model_list, total_count)
@@ -185,7 +205,7 @@ class VisviseAPI:
         if sorter:
             body["sorter"] = sorter
 
-        data = self._http.post("openapi/weaver/resource/get_model_list", body)
+        data = self._http.post("openapi/weaver/resource/get_model_list", body, rtx=rtx)
         models = [ModelInfo.from_dict(m) for m in data.get("model_list", [])]
         return models, data.get("total_count", 0)
 
@@ -197,12 +217,15 @@ class VisviseAPI:
         self,
         node_type: int,
         sub_type: Optional[int] = None,
+        *,
+        rtx: str,
     ) -> list[str]:
         """获取指定节点类型支持的算法模型列表。
 
         Args:
             node_type: 节点类型。
             sub_type: 子类型（仅 node_type=4 时使用）：1 视频生动画，2 文生动画。
+            rtx: 实际使用人的 RTX。**必填**。
 
         Returns:
             算法模型名称列表。
@@ -213,18 +236,19 @@ class VisviseAPI:
         body: dict = {"node_type": node_type}
         if sub_type is not None:
             body["type"] = sub_type
-        data = self._http.post("openapi/weaver/resource/list_algorithm_model", body)
+        data = self._http.post("openapi/weaver/resource/list_algorithm_model", body, rtx=rtx)
         return data.get("model_list", [])
 
     # ──────────────────────────────────────────────────────────────────────
     # 2.8  下载模型资产
     # ──────────────────────────────────────────────────────────────────────
 
-    def download_model(self, model_id: str) -> str:
+    def download_model(self, model_id: str, *, rtx: str) -> str:
         """生成模型资产的带签名下载 URL。
 
         Args:
             model_id: 模型 ID。
+            rtx: 实际使用人的 RTX。**必填**。
 
         Returns:
             带签名的下载 URL（24h 有效）。
@@ -235,6 +259,7 @@ class VisviseAPI:
         data = self._http.post(
             "openapi/weaver/resource/download_model",
             {"model_id": model_id},
+            rtx=rtx,
         )
         # data 字段直接是 URL 字符串
         return data  # type: ignore[return-value]
@@ -243,8 +268,12 @@ class VisviseAPI:
     # 2.9  删除模型资产
     # ──────────────────────────────────────────────────────────────────────
 
-    def delete_model(self, model_id: str) -> None:
+    def delete_model(self, model_id: str, *, rtx: str) -> None:
         """删除单个模型资产。
+
+        Args:
+            model_id: 待删除的模型 ID。
+            rtx: 实际使用人的 RTX。**必填**。
 
         Raises:
             WeaverError / 子类: 接口错误
@@ -252,17 +281,19 @@ class VisviseAPI:
         self._http.post(
             "openapi/weaver/resource/delete_model",
             {"model_id": model_id},
+            rtx=rtx,
         )
 
     # ──────────────────────────────────────────────────────────────────────
     # 2.10 批量删除模型
     # ──────────────────────────────────────────────────────────────────────
 
-    def batch_delete_model(self, model_ids: list[str]) -> None:
+    def batch_delete_model(self, model_ids: list[str], *, rtx: str) -> None:
         """批量删除模型资产。
 
         Args:
             model_ids: 待删除的模型 ID 列表。
+            rtx: 实际使用人的 RTX。**必填**。
 
         Raises:
             WeaverError / 子类: 接口错误
@@ -270,17 +301,19 @@ class VisviseAPI:
         self._http.post(
             "openapi/weaver/resource/batch_delete_model",
             {"model_ids": model_ids},
+            rtx=rtx,
         )
 
     # ──────────────────────────────────────────────────────────────────────
     # 2.11 去除图片背景
     # ──────────────────────────────────────────────────────────────────────
 
-    def remove_bg(self, image_url: str) -> str:
+    def remove_bg(self, image_url: str, *, rtx: str) -> str:
         """去除图片背景，返回透明背景图片 URL。
 
         Args:
             image_url: 输入图片地址。
+            rtx: 实际使用人的 RTX。**必填**。
 
         Returns:
             输出图片地址。
@@ -291,6 +324,7 @@ class VisviseAPI:
         data = self._http.post(
             "openapi/weaver/resource/remove_background",
             {"image_url": image_url},
+            rtx=rtx,
         )
         return data["image_url"]
 
@@ -304,6 +338,8 @@ class VisviseAPI:
         input_model: str,
         input_images: list[str],
         params: dict,
+        *,
+        rtx: str,
     ) -> list[str]:
         """批量图生 Pose（异步）。
 
@@ -312,6 +348,7 @@ class VisviseAPI:
             input_model: FBX 模型 COS 地址（zip）。
             input_images: 参考图片 URL 列表（1~10 张）。
             params: ImageGenPoseParams 字典，需包含 algorithm_model 和 output_model_format。
+            rtx: 实际使用人的 RTX。**必填**。
 
         Returns:
             新生成的模型 ID 列表。
@@ -325,18 +362,19 @@ class VisviseAPI:
             "input_images": input_images,
             "params": params,
         }
-        data = self._http.post("openapi/weaver/resource/batch_gen_pose", body)
+        data = self._http.post("openapi/weaver/resource/batch_gen_pose", body, rtx=rtx)
         return data["model_ids"]
 
     # ──────────────────────────────────────────────────────────────────────
     # 2.13 获取文生动画提示词 Demo 列表
     # ──────────────────────────────────────────────────────────────────────
 
-    def get_text2motion_prompt_list(self, language: str = "zh") -> list[str]:
+    def get_text2motion_prompt_list(self, language: str = "zh", *, rtx: str) -> list[str]:
         """获取文生动画提示词 Demo 列表。
 
         Args:
             language: 语言类型，"zh" 中文 / "en" 英文。
+            rtx: 实际使用人的 RTX。**必填**。
 
         Returns:
             提示词列表。
@@ -347,6 +385,7 @@ class VisviseAPI:
         data = self._http.post(
             "openapi/weaver/demo/get_text2motion_prompt_list",
             {"language": language},
+            rtx=rtx,
         )
         return data.get("prompt_list", [])
 
@@ -359,6 +398,7 @@ class VisviseAPI:
         name: str,
         algorithm_model: str,
         *,
+        rtx: str,
         model_id: Optional[str] = None,
         input_view: Optional[View] = None,
         split_type: Optional[int] = None,
@@ -374,6 +414,7 @@ class VisviseAPI:
         Args:
             name: 资产名称（最长 100 字符）。
             algorithm_model: 算法模型名称。
+            rtx: 实际使用人的 RTX。**必填**。
             model_id: 图生 360 的 model_id。
             input_view: 输入视图。
             split_type: 拆分方式，1 正视图（默认）/ 2 四视图。
@@ -402,4 +443,4 @@ class VisviseAPI:
         if prompt is not None:
             body["prompt"] = prompt
 
-        return self._http.post_sse("openapi/weaver/component/init_segment", body)
+        return self._http.post_sse("openapi/weaver/component/init_segment", body, rtx=rtx)

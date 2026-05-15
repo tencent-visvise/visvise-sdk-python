@@ -14,7 +14,7 @@ from visvise import Environment, VisviseClient, OutputModelFormat
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
-UID        = os.environ["VISVISE_UID"]
+RTX        = os.environ["VISVISE_RTX"]
 ENV        = os.environ.get("VISVISE_ENV", "prod")
 ENV_MAP    = {"prod": Environment.PROD, "test": Environment.TEST, "dev": Environment.DEV}
 
@@ -22,7 +22,7 @@ ASSETS = Path(__file__).parent / "assets"
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, UID, env=ENV_MAP[ENV])  # noqa
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     print("[gen_pose] 开始图生 Pose...")
 
@@ -34,11 +34,12 @@ def main():
         algorithm_model="VISVISE-PosingAI-V1.0.0",
         output_model_format=OutputModelFormat.FBX,
         name="example_gen_pose",
+        rtx=RTX,
     )
     print(f"[gen_pose] 任务已创建，model_ids={model_ids}")
 
     for mid in model_ids:
-        model = client.wait_model(mid, interval=3, timeout=600)
+        model = client.wait_model(mid, interval=3, timeout=600, rtx=RTX)
         print(f"[gen_pose] {mid} 生成成功！耗时 {model.time_cost}s")
         print(f"  output_model : {model.output_model}")
 

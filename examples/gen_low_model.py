@@ -14,7 +14,7 @@ from visvise import Environment, VisviseClient, FaceType, OutputModelFormat
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
-UID        = os.environ["VISVISE_UID"]
+RTX        = os.environ["VISVISE_RTX"]
 ENV        = os.environ.get("VISVISE_ENV", "prod")
 ENV_MAP    = {"prod": Environment.PROD, "test": Environment.TEST, "dev": Environment.DEV}
 
@@ -22,7 +22,7 @@ ASSETS = Path(__file__).parent / "assets"
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, UID, env=ENV_MAP[ENV])  # noqa
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     print("[gen_low_model] 开始生成低模...")
 
@@ -32,10 +32,11 @@ def main():
         output_model_format=OutputModelFormat.FBX,
         face_type=FaceType.TRIANGLE,
         name="example_gen_low_model",
+        rtx=RTX,
     )
     print(f"[gen_low_model] 任务已创建，model_id={model_id}")
 
-    model = client.wait_model(model_id, interval=3, timeout=600)
+    model = client.wait_model(model_id, interval=3, timeout=600, rtx=RTX)
     print(f"[gen_low_model] 生成成功！耗时 {model.time_cost}s")
     print(f"  output_model : {model.output_model}")
 

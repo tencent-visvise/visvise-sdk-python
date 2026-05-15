@@ -17,13 +17,13 @@ from visvise import Environment, VisviseClient, SegmentSplitType, SegmentGranula
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
-UID        = os.environ["VISVISE_UID"]
+RTX        = os.environ["VISVISE_RTX"]
 ENV        = os.environ.get("VISVISE_ENV", "prod")
 ENV_MAP    = {"prod": Environment.PROD, "test": Environment.TEST, "dev": Environment.DEV}
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, UID, env=ENV_MAP[ENV])  # noqa
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     # 需要先有 gen_360 输出的 model_id
     mv_model_id = os.environ.get("MV_360_MODEL_ID")
@@ -43,6 +43,7 @@ def main():
         prompt=None,            # 可选：自然语言描述拆分规则
         name="example_gen_segment_2d",
         on_thinking=on_thinking,
+        rtx=RTX,
     )
     print(f"[gen_segment_2d] 分割完成，model_id={seg_model_id}")
     print(f"  → 可作为图生中模/低模的 segment_model_id 参数使用")

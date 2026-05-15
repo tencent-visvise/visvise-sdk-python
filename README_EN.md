@@ -44,13 +44,13 @@ Python SDK for the VISVISE Weaver OpenAPI. It provides:
 Install directly from the GitHub repository (Tencent Cloud COS dependency included):
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.2
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.3
 ```
 
 Or via SSH:
 
 ```bash
-pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.0.2
+pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.0.3
 ```
 
 > **Note:** The Tencent Cloud COS SDK is bundled by default; local file auto-upload works out of the box.
@@ -65,17 +65,17 @@ from visvise import VisviseClient, FaceType, OutputModelFormat
 client = VisviseClient(
     app_id="your_app_id",
     secret_key="your_secret_key",
-    uid="your_uid",
 )
 
 # 1) Image-to-360: upload local image, generate multi-views
 mv_model_id = client.gen_360(
     main_view="character.png",          # local path, SDK uploads automatically
     name="my_360",
+    rtx="caller_rtx",
 )
 
 # 2) Wait for completion, fetch multi-view output
-mv_info = client.wait_model(mv_model_id, interval=3, timeout=300)
+mv_info = client.wait_model(mv_model_id, interval=3, timeout=300, rtx="caller_rtx")
 output_view = mv_info.image_gen_360_output.output_view
 
 # 3) Image-to-high-poly (pass COS URLs directly)
@@ -87,10 +87,11 @@ high_model_id = client.gen_high_model(
     output_model_format=OutputModelFormat.FBX,
     face_type=FaceType.TRIANGLE,
     face_num=500000,
+    rtx="caller_rtx",
 )
 
 # 4) Wait for completion
-model_info = client.wait_model(high_model_id, timeout=900)
+model_info = client.wait_model(high_model_id, timeout=900, rtx="caller_rtx")
 print("Output model:", model_info.output_model)
 ```
 
@@ -104,7 +105,6 @@ from visvise import VisviseClient, Environment
 client = VisviseClient(
     app_id="your_app_id",       # required, assigned by platform
     secret_key="your_key",      # required, assigned by platform
-    uid="your_uid",             # required, the user ID of the account that obtained the key
     env=Environment.PROD,       # optional, default: production
     timeout=30,                 # optional, per-request HTTP timeout in seconds (default 30)
 )
@@ -114,9 +114,11 @@ client = VisviseClient(
 |---|---|---|
 | `app_id` | ✅ | Client identifier assigned by the platform |
 | `secret_key` | ✅ | Signing key assigned by the platform |
-| `uid` | ✅ | User ID, obtained from the account that registered the key |
 | `env` | — | Environment: `Environment.PROD` (default) / `Environment.TEST` / `Environment.DEV` or a custom URL |
 | `timeout` | — | Per-request HTTP timeout in seconds (default 30) |
+
+> **About the `rtx` parameter**: every API call requires an `rtx` argument (the actual user's RTX company account); it is **not** bound at client construction time.
+> Per company policy, **internal users MUST pass the actual end-user's RTX** — using a shared / project account is not allowed. External users may pass any business identifier.
 
 ---
 
@@ -187,7 +189,7 @@ from visvise import (
     ReduceFace, View,
 )
 
-client = VisviseClient(app_id="...", secret_key="...", uid="...")
+client = VisviseClient(app_id="...", secret_key="...")
 ```
 
 ### gen_360 — Image to 360
@@ -203,7 +205,8 @@ model_id = client.gen_360(
     style=None,                          # optional, style (VISVISE proprietary models only). Must be one of ImageGen360Style: GRAY_MODEL/PHOTOREAL/Q_TOON/PIXEL — any other value will be rejected
     back_view=None,                      # optional, back view to improve quality
     left_view=None,                      # optional, left view
-    right_view=None,                     # optional, right view
+    right_view=None,                     # optional, right view,
+    rtx="caller_rtx",
 )
 ```
 
@@ -223,7 +226,8 @@ model_id = client.gen_high_model(
     face_num=None,                                 # optional, target face count (1000-1500000); auto-tuned if omitted
     back_view=None,                                # optional, back view to improve quality
     left_view=None,                                # optional, left view
-    right_view=None,                               # optional, right view
+    right_view=None,                               # optional, right view,
+    rtx="caller_rtx",
 )
 ```
 
@@ -243,7 +247,8 @@ model_id = client.gen_mid_model(
     output_model_format=OutputModelFormat.FBX,    # optional, output format
     face_type=FaceType.TRIANGLE,                  # optional, face type
     name="gen_mid_model",                          # optional, task name
-    segment_model_id=None,                         # optional, 2D segmentation asset ID (mid-poly only)
+    segment_model_id=None,                         # optional, 2D segmentation asset ID (mid-poly only),
+    rtx="caller_rtx",
 )
 ```
 
@@ -262,7 +267,8 @@ model_id = client.gen_low_model(
     name="gen_low_model",                          # optional, task name
     back_view=None,                                # optional, back view
     left_view=None,                                # optional, left view
-    right_view=None,                               # optional, right view
+    right_view=None,                               # optional, right view,
+    rtx="caller_rtx",
 )
 ```
 
@@ -279,7 +285,8 @@ model_id = client.gen_mesh_refine(
     input_model_format="fbx",                     # optional, input format (default fbx)
     name="gen_mesh_refine",                        # optional, task name
     mode=None,                                     # optional, MeshRefineMode.OPTIMIZE(1, default) / DENSIFY(2)
-    color_model=None,                              # optional, colored model used to attach color info
+    color_model=None,                              # optional, colored model used to attach color info,
+    rtx="caller_rtx",
 )
 ```
 
@@ -299,7 +306,8 @@ model_id = client.gen_retopology(
     face_type=FaceType.QUAD,                      # optional, face type (default quad)
     name="gen_retopology",                         # optional, task name
     detail_level=DetailLevel.HIGH,                # optional (required by Hunyuan): DetailLevel.LOW/MEDIUM/HIGH
-    face_num=None,                                 # optional (required by VISVISE proprietary): target face count
+    face_num=None,                                 # optional (required by VISVISE proprietary): target face count,
+    rtx="caller_rtx",
 )
 ```
 
@@ -319,7 +327,8 @@ model_ids = client.gen_lod(
     algorithm_model=None,                          # optional, e.g. "VISVISE-LOD-V1.0.0"
     output_model_format=OutputModelFormat.FBX,    # optional, output format
     name="gen_lod",                                # optional, task name
-    gen_times=3,                                   # optional, number of variants (use 1 to disable multi-shot)
+    gen_times=3,                                   # optional, number of variants (use 1 to disable multi-shot),
+    rtx="caller_rtx",
 )
 ```
 
@@ -334,7 +343,8 @@ model_id = client.gen_uv(
     model_path="path/to/model.fbx",               # required, input model
     algorithm_model=None,                          # optional, e.g. "hunyuan3D-UV-v2.0"
     name="gen_uv",                                 # optional, task name
-    enable_auto_smoothing=None,                    # optional, enable auto-smoothing
+    enable_auto_smoothing=None,                    # optional, enable auto-smoothing,
+    rtx="caller_rtx",
 )
 ```
 
@@ -354,7 +364,8 @@ model_id = client.gen_texture(
     input_view=View(main_view="path/to/ref.png"), # optional, reference view (or use prompt instead)
     resolution=None,                               # optional, resolution (e.g. 1024 / 2048)
     unwarp_uv=None,                                # optional, also unwrap UV
-    prompt=None,                                   # optional, text prompt for the texture
+    prompt=None,                                   # optional, text prompt for the texture,
+    rtx="caller_rtx",
 )
 ```
 
@@ -370,7 +381,8 @@ model_id = client.gen_rigging(
     algorithm_model=None,                          # optional, e.g. "VISVISE-GoRigging-V1.0.0"
     mesh_category="humanoid",                     # optional, "humanoid" (default) or "tetrapod"
     name="gen_rigging",                            # optional, task name
-    template_skeleton=None,                        # optional, template skeleton to base the rig on
+    template_skeleton=None,                        # optional, template skeleton to base the rig on,
+    rtx="caller_rtx",
 )
 ```
 
@@ -386,7 +398,8 @@ model_id = client.gen_skinning(
     mesh_names=["Body_Mesh", "Hair_Mesh"],         # required, meshes to skin
     joint_names=["Bip001", "Bip001 Pelvis"],       # required, joints to skin
     algorithm_model=None,                          # optional, e.g. "VISVISE-GoSkinning-V1.0.0"
-    name="gen_skinning",                           # optional, task name
+    name="gen_skinning",                           # optional, task name,
+    rtx="caller_rtx",
 )
 ```
 
@@ -405,7 +418,8 @@ model_id = client.gen_video_motion(
     name="gen_video_motion",                       # optional, task name
     with_hand=None,                                # optional, enable hand capture
     multiple_track=None,                           # optional, enable multi-person capture
-    rotate_axis_angle=None,                        # optional, rotation axis-angle [x, y, z] (radians)
+    rotate_axis_angle=None,                        # optional, rotation axis-angle [x, y, z] (radians),
+    rtx="caller_rtx",
 )
 ```
 
@@ -421,7 +435,8 @@ model_ids = client.gen_text_motion(
     prompt="a person breakdancing",                # required, animation prompt
     algorithm_model=None,                          # optional, e.g. "VISVISE-TextMotion-V1.1.0"
     output_model_format=OutputModelFormat.FBX,    # optional, output format
-    name="gen_text_motion",                        # optional, task name
+    name="gen_text_motion",                        # optional, task name,
+    rtx="caller_rtx",
 )
 # model_ids contains 4 IDs, wait for whichever you prefer
 ```
@@ -441,7 +456,8 @@ model_ids = client.gen_pose(
     ],
     algorithm_model=None,                          # optional, e.g. "VISVISE-PosingAI-V1.0.0"
     output_model_format=OutputModelFormat.FBX,    # optional, output format
-    name="gen_pose",                               # optional, task name
+    name="gen_pose",                               # optional, task name,
+    rtx="caller_rtx",
 )
 ```
 
@@ -463,10 +479,11 @@ seg_model_id = client.gen_segment_2d(
     split_type=None,                               # optional, SegmentSplitType.FRONT_VIEW(1, default) / FOUR_VIEW(2)
     granularity=None,                              # optional, SegmentGranularity.COARSE(1) / MEDIUM(2, default) / FINE(3)
     prompt=None,                                   # optional, natural-language splitting rule (max 200 chars)
-    on_thinking=on_thinking,                       # optional, callback for thinking events
+    on_thinking=on_thinking,                       # optional, callback for thinking events,
+    rtx="caller_rtx",
 )
 # Use the result as segment_model_id for gen_mid_model / gen_low_model
-mid_id = client.gen_mid_model(..., segment_model_id=seg_model_id)
+mid_id = client.gen_mid_model(..., segment_model_id=seg_model_id, rtx="caller_rtx")
 ```
 
 ---
@@ -479,7 +496,8 @@ Poll until an async task finishes; returns `ModelInfo`.
 model_info = client.wait_model(
     model_id="Model2026033100192028",
     interval=2,     # poll interval in seconds (default 2)
-    timeout=600,    # max wait in seconds (default 600)
+    timeout=600,    # max wait in seconds (default 600),
+    rtx="caller_rtx",
 )
 
 print(model_info.output_model)   # output model URL
@@ -497,38 +515,39 @@ print(model_info.time_cost)      # elapsed seconds
 
 ## Atomic API Methods
 
-Access low-level endpoints via `client.api.xxx()`:
+Access low-level endpoints via `client.api.xxx(rtx="caller_rtx")`:
 
 ```python
 # Get temporary upload credentials
-cred = client.api.get_cos_cred()
+cred = client.api.get_cos_cred(rtx="caller_rtx")
 
 # Query remaining quota
-quota = client.api.get_user_quota()
+quota = client.api.get_user_quota(rtx="caller_rtx")
 print(quota.quota)  # remaining count
 
 # Fetch model list
 models, total = client.api.get_model_list(
     model_id_list=["Model2026..."],
+    rtx="caller_rtx",
 )
 
 # Fetch algorithm models for a node type
-alg_models = client.api.list_algorithm_model(node_type=4, sub_type=1)
+alg_models = client.api.list_algorithm_model(node_type=4, sub_type=1, rtx="caller_rtx")
 
 # Get download URL
-url = client.api.download_model("Model2026...")
+url = client.api.download_model("Model2026...", rtx="caller_rtx")
 
 # Delete a single model
-client.api.delete_model("Model2026...")
+client.api.delete_model("Model2026...", rtx="caller_rtx")
 
 # Batch delete
-client.api.batch_delete_model(["Model2026...", "Model2026..."])
+client.api.batch_delete_model(["Model2026...", "Model2026..."], rtx="caller_rtx")
 
 # Remove background
-out_url = client.api.remove_bg("https://cos.../image.png")
+out_url = client.api.remove_bg("https://cos.../image.png", rtx="caller_rtx")
 
 # Text-to-motion prompt suggestions
-prompts = client.api.get_text2motion_prompt_list(language="en")
+prompts = client.api.get_text2motion_prompt_list(language="en", rtx="caller_rtx")
 ```
 
 ---
@@ -560,8 +579,8 @@ from visvise import VisviseClient, WeaverError, QuotaExceededError, PollingTimeo
 client = VisviseClient(...)
 
 try:
-    model_id = client.gen_360("image.png")
-    model = client.wait_model(model_id)
+    model_id = client.gen_360("image.png", rtx="caller_rtx")
+    model = client.wait_model(model_id, rtx="caller_rtx")
 except QuotaExceededError:
     print("Daily quota exceeded; please try again tomorrow")
 except PollingTimeoutError as e:
@@ -579,12 +598,12 @@ except WeaverError as e:
 ```python
 from visvise import VisviseClient, FaceType, OutputModelFormat
 
-client = VisviseClient(app_id="...", secret_key="...", uid="...")
+client = VisviseClient(app_id="...", secret_key="...")
 
 # Step 1: Image-to-360
 print("Step 1: generating multi-views...")
-mv_id = client.gen_360(main_view="character.png")
-mv = client.wait_model(mv_id, interval=3, timeout=300)
+mv_id = client.gen_360(main_view="character.png", rtx="caller_rtx")
+mv = client.wait_model(mv_id, interval=3, timeout=300, rtx="caller_rtx")
 views = mv.image_gen_360_output.output_view
 
 # Step 2: High-poly model
@@ -595,8 +614,9 @@ high_id = client.gen_high_model(
     left_view=views.left_view,
     right_view=views.right_view,
     face_type=FaceType.TRIANGLE,
+    rtx="caller_rtx",
 )
-high_model = client.wait_model(high_id, timeout=900)
+high_model = client.wait_model(high_id, timeout=900, rtx="caller_rtx")
 print("High-poly download URL:", high_model.output_model)
 ```
 
@@ -607,14 +627,15 @@ print("High-poly download URL:", high_model.output_model)
 ```python
 from visvise import VisviseClient, OutputModelFormat
 
-client = VisviseClient(app_id="...", secret_key="...", uid="...")
+client = VisviseClient(app_id="...", secret_key="...")
 
 # Step 1: Rigging (pass raw model — SDK auto-zips)
 rig_id = client.gen_rigging(
     model_path="character.fbx",
     mesh_category="humanoid",
+    rtx="caller_rtx",
 )
-rig = client.wait_model(rig_id, timeout=600)
+rig = client.wait_model(rig_id, timeout=600, rtx="caller_rtx")
 print("Rigged model:", rig.output_model)
 
 # Step 2: Skinning (pass rigged model)
@@ -622,8 +643,9 @@ skin_id = client.gen_skinning(
     model_path="rigged_character.fbx",
     mesh_names=["Body_Mesh"],
     joint_names=["Bip001", "Bip001 Pelvis"],
+    rtx="caller_rtx",
 )
-skin = client.wait_model(skin_id, timeout=600)
+skin = client.wait_model(skin_id, timeout=600, rtx="caller_rtx")
 
 # Step 3: Video-to-animation
 anim_id = client.gen_video_motion(
@@ -631,8 +653,9 @@ anim_id = client.gen_video_motion(
     video_path="dance.mp4",
     output_model_format=OutputModelFormat.FBX,
     with_hand=True,
+    rtx="caller_rtx",
 )
-anim = client.wait_model(anim_id, timeout=900)
+anim = client.wait_model(anim_id, timeout=900, rtx="caller_rtx")
 print("Animation download URL:", anim.output_model)
 ```
 
@@ -643,7 +666,7 @@ print("Animation download URL:", anim.output_model)
 ```python
 from visvise import VisviseClient, ReduceFace, FaceType, OutputModelFormat
 
-client = VisviseClient(app_id="...", secret_key="...", uid="...")
+client = VisviseClient(app_id="...", secret_key="...")
 
 model_ids = client.gen_lod(
     model_path="high_model.fbx",
@@ -653,10 +676,11 @@ model_ids = client.gen_lod(
     ],
     output_model_format=OutputModelFormat.FBX,
     gen_times=3,
+    rtx="caller_rtx",
 )
 
 # Wait for all variants
-results = [client.wait_model(mid, timeout=300) for mid in model_ids]
+results = [client.wait_model(mid, timeout=300, rtx="caller_rtx") for mid in model_ids]
 for r in results:
     print(r.model_id, r.output_model)
 ```

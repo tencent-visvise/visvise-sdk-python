@@ -12,10 +12,10 @@ from visvise import VisviseClient
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
-UID        = os.environ["VISVISE_UID"]
+RTX        = os.environ["VISVISE_RTX"]
 ASSETS     = Path(__file__).parent / "assets"
 
-client = VisviseClient(APP_ID, SECRET_KEY, UID)
+client = VisviseClient(APP_ID, SECRET_KEY)
 results = []
 
 def ok(name, detail=""):
@@ -33,7 +33,7 @@ def run(name, fn):
 
 # 1. get_user_quota
 def t_quota():
-    q = client.api.get_user_quota()
+    q = client.api.get_user_quota(rtx=RTX)
     assert isinstance(q.quota, int) and q.quota >= 0
     ok("get_user_quota", f"quota={q.quota}  server_ts={q.server_ts}")
 run("get_user_quota", t_quota)
@@ -45,7 +45,7 @@ def t_list_alg():
         (4, 1, "视频生动画"), (4, 2, "文生动画"),
         (5, None, "骨骼架设"), (2, None, "LOD"),
     ]:
-        models = client.api.list_algorithm_model(node_type, sub_type)
+        models = client.api.list_algorithm_model(node_type, sub_type, rtx=RTX)
         assert isinstance(models, list) and len(models) > 0, f"{label} 返回空列表"
         ok(f"list_algorithm_model {label}", f"first={models[0]}  count={len(models)}")
 run("list_algorithm_model", t_list_alg)
@@ -53,7 +53,7 @@ run("list_algorithm_model", t_list_alg)
 # 3. get_text2motion_prompt_list — zh / en
 def t_prompts():
     for lang in ["zh", "en"]:
-        prompts = client.api.get_text2motion_prompt_list(language=lang)
+        prompts = client.api.get_text2motion_prompt_list(language=lang, rtx=RTX)
         assert isinstance(prompts, list) and len(prompts) > 0
         ok(f"get_text2motion_prompt_list lang={lang}",
            f"count={len(prompts)}  first={prompts[0]!r}")
@@ -62,7 +62,7 @@ run("get_text2motion_prompt_list", t_prompts)
 # 4. remove_bg — 上传本地图片后调用
 def t_remove_bg():
     cos_url = client._resolve_file(str(ASSETS / "main_view.png"))
-    result_url = client.api.remove_bg(cos_url)
+    result_url = client.api.remove_bg(cos_url, rtx=RTX)
     assert result_url.startswith("http"), f"URL 格式异常：{result_url!r}"
     ok("remove_bg", f"output_url={result_url[:80]}...")
 run("remove_bg", t_remove_bg)
@@ -70,7 +70,7 @@ run("remove_bg", t_remove_bg)
 # 5. download_model — 用已有成功模型
 KNOWN_MODEL_ID = "Model2026042300226056"
 def t_download():
-    url = client.api.download_model(KNOWN_MODEL_ID)
+    url = client.api.download_model(KNOWN_MODEL_ID, rtx=RTX)
     assert url.startswith("http"), f"URL 格式异常：{url!r}"
     ok("download_model", f"url={url[:80]}...")
 run("download_model", t_download)
@@ -86,18 +86,19 @@ def t_delete():
             client._resolve_file(str(ASSETS / "main_view.png")),
         ],
         params={"algorithm_model": "VISVISE-PosingAI-V1.0.0", "output_model_format": "fbx"},
+        rtx=RTX,
     )
     assert len(ids) == 2, f"期望 2 个 id，实际：{ids}"
     print(f"  ids={ids}", flush=True)
 
-    client.api.delete_model(ids[0])
+    client.api.delete_model(ids[0], rtx=RTX)
     ok("delete_model", f"deleted {ids[0]}")
 
-    client.api.batch_delete_model([ids[1]])
+    client.api.batch_delete_model([ids[1]], rtx=RTX)
     ok("batch_delete_model", f"batch deleted {ids[1]}")
 
     # 验证已删除（查询不到）
-    models, _ = client.api.get_model_list(model_id_list=ids, limit=10)
+    models, _ = client.api.get_model_list(model_id_list=ids, limit=10, rtx=RTX)
     remaining = {m.model_id for m in models}
     for mid in ids:
         assert mid not in remaining, f"{mid} 删除后仍能查到"

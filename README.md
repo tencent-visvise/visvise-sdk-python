@@ -44,13 +44,13 @@ VISVISE Weaver OpenAPI 的 Python SDK，提供：
 直接从 GitHub 仓库安装（包含 COS 上传依赖）：
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.2
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.3
 ```
 
 或通过 SSH：
 
 ```bash
-pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.0.2
+pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.0.3
 ```
 
 > **注：** 安装后即包含腾讯云 COS SDK，可直接使用本地文件自动上传功能，无需额外安装。
@@ -65,17 +65,17 @@ from visvise import VisviseClient, FaceType, OutputModelFormat
 client = VisviseClient(
     app_id="your_app_id",
     secret_key="your_secret_key",
-    uid="your_uid",
 )
 
 # ① 图生360：上传本地图片，生成多视图
 mv_model_id = client.gen_360(
     main_view="character.png",          # 本地文件路径，SDK 自动上传
     name="my_360",
+    rtx="caller_rtx",
 )
 
 # ② 等待图生360完成，获取多视图输出
-mv_info = client.wait_model(mv_model_id, interval=3, timeout=300)
+mv_info = client.wait_model(mv_model_id, interval=3, timeout=300, rtx="caller_rtx")
 output_view = mv_info.image_gen_360_output.output_view
 
 # ③ 图生高模（多视图输出的 COS URL 直接传入）
@@ -87,10 +87,11 @@ high_model_id = client.gen_high_model(
     output_model_format=OutputModelFormat.FBX,
     face_type=FaceType.TRIANGLE,
     face_num=500000,
+    rtx="caller_rtx",
 )
 
 # ④ 等待高模完成
-model_info = client.wait_model(high_model_id, timeout=900)
+model_info = client.wait_model(high_model_id, timeout=900, rtx="caller_rtx")
 print("输出模型：", model_info.output_model)
 ```
 
@@ -104,7 +105,6 @@ from visvise import VisviseClient, Environment
 client = VisviseClient(
     app_id="your_app_id",       # 必填，由平台分配
     secret_key="your_key",      # 必填，由平台分配
-    uid="your_uid",             # 必填，从申请 key 的登录账号获取
     env=Environment.PROD,       # 可选，默认生产环境
     timeout=30,                 # 可选，单次请求超时（秒），默认 30
 )
@@ -114,9 +114,11 @@ client = VisviseClient(
 |---|---|---|
 | `app_id` | ✅ | 由平台分配的客户端标识 |
 | `secret_key` | ✅ | 由平台分配的签名密钥 |
-| `uid` | ✅ | 用户 ID，从申请 key 的登录账号获取 |
 | `env` | — | 环境：`Environment.PROD`（默认）/ `Environment.TEST` / `Environment.DEV` 或自定义 URL |
 | `timeout` | — | 单次 HTTP 请求超时（秒），默认 30 |
+
+> **关于 `rtx` 参数**：每次接口调用都需在方法参数中传入 `rtx`（实际使用人的 RTX 公司账号），它不在 client 构造函数中绑定。
+> 按公司要求，**内部用户必须传入实际使用人的 rtx**，不可使用项目账号或共享账号代填；外部用户可传业务标识。
 
 ---
 
@@ -187,7 +189,7 @@ from visvise import (
     ReduceFace, View,
 )
 
-client = VisviseClient(app_id="...", secret_key="...", uid="...")
+client = VisviseClient(app_id="...", secret_key="...")
 ```
 
 ### gen_360 — 图生360
@@ -203,7 +205,8 @@ model_id = client.gen_360(
     style=None,                          # 可选，风格类型（仅 VISVISE 自研模型支持），只接受 ImageGen360Style 枚举：GRAY_MODEL/PHOTOREAL/Q_TOON/PIXEL，传其他值会报错
     back_view=None,                      # 可选，背视图，提升生成质量
     left_view=None,                      # 可选，左视图
-    right_view=None,                     # 可选，右视图
+    right_view=None,                     # 可选，右视图,
+    rtx="caller_rtx",
 )
 ```
 
@@ -223,7 +226,8 @@ model_id = client.gen_high_model(
     face_num=None,                                 # 可选，目标面数（1000~1500000），不传则自动配置
     back_view=None,                                # 可选，背视图，提升质量
     left_view=None,                                # 可选，左视图
-    right_view=None,                               # 可选，右视图
+    right_view=None,                               # 可选，右视图,
+    rtx="caller_rtx",
 )
 ```
 
@@ -243,7 +247,8 @@ model_id = client.gen_mid_model(
     output_model_format=OutputModelFormat.FBX,    # 可选，输出格式（默认 fbx）
     face_type=FaceType.TRIANGLE,                  # 可选，面数类型
     name="gen_mid_model",                          # 可选，任务名称
-    segment_model_id=None,                         # 可选，2D 分割资产 ID（仅中模有效），用于基于分割结果生成
+    segment_model_id=None,                         # 可选，2D 分割资产 ID（仅中模有效），用于基于分割结果生成,
+    rtx="caller_rtx",
 )
 ```
 
@@ -262,7 +267,8 @@ model_id = client.gen_low_model(
     name="gen_low_model",                          # 可选，任务名称
     back_view=None,                                # 可选，背视图
     left_view=None,                                # 可选，左视图
-    right_view=None,                               # 可选，右视图
+    right_view=None,                               # 可选，右视图,
+    rtx="caller_rtx",
 )
 ```
 
@@ -279,7 +285,8 @@ model_id = client.gen_mesh_refine(
     input_model_format=OutputModelFormat.FBX,                     # 可选，输入模型格式（默认 fbx）
     name="gen_mesh_refine",                        # 可选，任务名称
     mode=None,                                     # 可选，MeshRefineMode.OPTIMIZE(1, 默认) / DENSIFY(2)
-    color_model=None,                              # 可选，带颜色的模型，用于为输出附加颜色
+    color_model=None,                              # 可选，带颜色的模型，用于为输出附加颜色,
+    rtx="caller_rtx",
 )
 ```
 
@@ -299,7 +306,8 @@ model_id = client.gen_retopology(
     face_type=FaceType.QUAD,                      # 可选，面数类型（默认四边面）
     name="gen_retopology",                         # 可选，任务名称
     detail_level=DetailLevel.HIGH,                # 可选，混元模型必传：DetailLevel.LOW/MEDIUM/HIGH
-    face_num=None,                                 # 可选，VISVISE 自研模型必传：指定输出面数
+    face_num=None,                                 # 可选，VISVISE 自研模型必传：指定输出面数,
+    rtx="caller_rtx",
 )
 ```
 
@@ -319,7 +327,8 @@ model_ids = client.gen_lod(
     algorithm_model=None,                          # 可选，如 "VISVISE-LOD-V1.0.0"
     output_model_format=OutputModelFormat.FBX,    # 可选，输出格式
     name="gen_lod",                                # 可选，任务名称
-    gen_times=3,                                   # 可选，生成次数（抽卡），不需要抽卡传 1
+    gen_times=3,                                   # 可选，生成次数（抽卡），不需要抽卡传 1,
+    rtx="caller_rtx",
 )
 ```
 
@@ -334,7 +343,8 @@ model_id = client.gen_uv(
     model_path="path/to/model.fbx",               # 必填，输入模型
     algorithm_model=None,                          # 可选，如 "hunyuan3D-UV-v2.0"
     name="gen_uv",                                 # 可选，任务名称
-    enable_auto_smoothing=None,                    # 可选，是否启用自动平滑
+    enable_auto_smoothing=None,                    # 可选，是否启用自动平滑,
+    rtx="caller_rtx",
 )
 ```
 
@@ -354,7 +364,8 @@ model_id = client.gen_texture(
     input_view=View(main_view="path/to/ref.png"), # 可选，原画视图（与 prompt 至少传一个）
     resolution=None,                               # 可选，分辨率（如 1024 / 2048）
     unwarp_uv=None,                                # 可选，是否同时展开 UV
-    prompt=None,                                   # 可选，贴图文本提示词
+    prompt=None,                                   # 可选，贴图文本提示词,
+    rtx="caller_rtx",
 )
 ```
 
@@ -370,7 +381,8 @@ model_id = client.gen_rigging(
     algorithm_model=None,                          # 可选，如 "VISVISE-GoRigging-V1.0.0"
     mesh_category="humanoid",                     # 可选，"humanoid"（人形，默认）或 "tetrapod"（四足）
     name="gen_rigging",                            # 可选，任务名称
-    template_skeleton=None,                        # 可选，模板骨骼，传入后将基于该模板进行架设
+    template_skeleton=None,                        # 可选，模板骨骼，传入后将基于该模板进行架设,
+    rtx="caller_rtx",
 )
 ```
 
@@ -386,7 +398,8 @@ model_id = client.gen_skinning(
     mesh_names=["Body_Mesh", "Hair_Mesh"],         # 必填，需要蒙皮的网格名称列表
     joint_names=["Bip001", "Bip001 Pelvis"],       # 必填，需要蒙皮的骨骼名称列表
     algorithm_model=None,                          # 可选，如 "VISVISE-GoSkinning-V1.0.0"
-    name="gen_skinning",                           # 可选，任务名称
+    name="gen_skinning",                           # 可选，任务名称,
+    rtx="caller_rtx",
 )
 ```
 
@@ -405,7 +418,8 @@ model_id = client.gen_video_motion(
     name="gen_video_motion",                       # 可选，任务名称
     with_hand=None,                                # 可选，是否开启手部捕捉
     multiple_track=None,                           # 可选，是否开启多人捕捉
-    rotate_axis_angle=None,                        # 可选，旋转轴角 [x, y, z]（弧度）
+    rotate_axis_angle=None,                        # 可选，旋转轴角 [x, y, z]（弧度）,
+    rtx="caller_rtx",
 )
 ```
 
@@ -421,7 +435,8 @@ model_ids = client.gen_text_motion(
     prompt="一个人在跳街舞",                        # 必填，动画提示词
     algorithm_model=None,                          # 可选，如 "VISVISE-TextMotion-V1.1.0"
     output_model_format=OutputModelFormat.FBX,    # 可选，输出格式
-    name="gen_text_motion",                        # 可选，任务名称
+    name="gen_text_motion",                        # 可选，任务名称,
+    rtx="caller_rtx",
 )
 # model_ids 包含 4 个 ID，等待其中你需要的那个即可
 ```
@@ -441,7 +456,8 @@ model_ids = client.gen_pose(
     ],
     algorithm_model=None,                          # 可选，如 "VISVISE-PosingAI-V1.0.0"
     output_model_format=OutputModelFormat.FBX,    # 可选，输出格式
-    name="gen_pose",                               # 可选，任务名称
+    name="gen_pose",                               # 可选，任务名称,
+    rtx="caller_rtx",
 )
 ```
 
@@ -463,10 +479,11 @@ seg_model_id = client.gen_segment_2d(
     split_type=None,                               # 可选，SegmentSplitType.FRONT_VIEW(1, 默认) / FOUR_VIEW(2)
     granularity=None,                              # 可选，SegmentGranularity.COARSE(1) / MEDIUM(2, 默认) / FINE(3)
     prompt=None,                                   # 可选，自然语言描述拆分规则（最长 200 字符）
-    on_thinking=on_thinking,                       # 可选，处理 thinking 事件的回调
+    on_thinking=on_thinking,                       # 可选，处理 thinking 事件的回调,
+    rtx="caller_rtx",
 )
 # 后续可作为 segment_model_id 传给 gen_mid_model / gen_low_model
-mid_id = client.gen_mid_model(..., segment_model_id=seg_model_id)
+mid_id = client.gen_mid_model(..., segment_model_id=seg_model_id, rtx="caller_rtx")
 ```
 
 ---
@@ -479,7 +496,8 @@ mid_id = client.gen_mid_model(..., segment_model_id=seg_model_id)
 model_info = client.wait_model(
     model_id="Model2026033100192028",
     interval=2,     # 轮询间隔（秒），默认 2
-    timeout=600,    # 超时时长（秒），默认 600
+    timeout=600,    # 超时时长（秒），默认 600,
+    rtx="caller_rtx",
 )
 
 print(model_info.output_model)   # 输出模型下载 URL
@@ -497,38 +515,39 @@ print(model_info.time_cost)      # 耗时（秒）
 
 ## 原子 API 方法参考
 
-通过 `client.api.xxx()` 访问底层接口：
+通过 `client.api.xxx(rtx="caller_rtx")` 访问底层接口：
 
 ```python
 # 获取临时上传凭证
-cred = client.api.get_cos_cred()
+cred = client.api.get_cos_cred(rtx="caller_rtx")
 
 # 查询剩余配额
-quota = client.api.get_user_quota()
+quota = client.api.get_user_quota(rtx="caller_rtx")
 print(quota.quota)  # 剩余次数
 
 # 拉取模型列表
 models, total = client.api.get_model_list(
     model_id_list=["Model2026..."],
+    rtx="caller_rtx",
 )
 
 # 获取算法模型列表
-alg_models = client.api.list_algorithm_model(node_type=4, sub_type=1)
+alg_models = client.api.list_algorithm_model(node_type=4, sub_type=1, rtx="caller_rtx")
 
 # 获取下载链接
-url = client.api.download_model("Model2026...")
+url = client.api.download_model("Model2026...", rtx="caller_rtx")
 
 # 删除单个
-client.api.delete_model("Model2026...")
+client.api.delete_model("Model2026...", rtx="caller_rtx")
 
 # 批量删除
-client.api.batch_delete_model(["Model2026...", "Model2026..."])
+client.api.batch_delete_model(["Model2026...", "Model2026..."], rtx="caller_rtx")
 
 # 去除背景
-out_url = client.api.remove_bg("https://cos.../image.png")
+out_url = client.api.remove_bg("https://cos.../image.png", rtx="caller_rtx")
 
 # 文生动画提示词列表
-prompts = client.api.get_text2motion_prompt_list(language="zh")
+prompts = client.api.get_text2motion_prompt_list(language="zh", rtx="caller_rtx")
 ```
 
 ---
@@ -557,11 +576,11 @@ prompts = client.api.get_text2motion_prompt_list(language="zh")
 ```python
 from visvise import VisviseClient, WeaverError, QuotaExceededError, PollingTimeoutError
 
-client = VisviseClient(app_id="...", secret_key="...", uid="...")
+client = VisviseClient(app_id="...", secret_key="...")
 
 try:
-    model_id = client.gen_360("image.png")
-    model = client.wait_model(model_id)
+    model_id = client.gen_360("image.png", rtx="caller_rtx")
+    model = client.wait_model(model_id, rtx="caller_rtx")
 except QuotaExceededError:
     print("今日配额已用完，明天再试")
 except PollingTimeoutError as e:
@@ -579,12 +598,12 @@ except WeaverError as e:
 ```python
 from visvise import VisviseClient, FaceType, OutputModelFormat
 
-client = VisviseClient(app_id="...", secret_key="...", uid="...")
+client = VisviseClient(app_id="...", secret_key="...")
 
 # Step 1: 图生360
 print("Step 1: 生成多视图...")
-mv_id = client.gen_360(main_view="character.png")
-mv = client.wait_model(mv_id, interval=3, timeout=300)
+mv_id = client.gen_360(main_view="character.png", rtx="caller_rtx")
+mv = client.wait_model(mv_id, interval=3, timeout=300, rtx="caller_rtx")
 views = mv.image_gen_360_output.output_view
 
 # Step 2: 图生高模
@@ -595,8 +614,9 @@ high_id = client.gen_high_model(
     left_view=views.left_view,
     right_view=views.right_view,
     face_type=FaceType.TRIANGLE,
+    rtx="caller_rtx",
 )
-high_model = client.wait_model(high_id, timeout=900)
+high_model = client.wait_model(high_id, timeout=900, rtx="caller_rtx")
 print("高模下载地址：", high_model.output_model)
 ```
 
@@ -607,14 +627,15 @@ print("高模下载地址：", high_model.output_model)
 ```python
 from visvise import VisviseClient, OutputModelFormat
 
-client = VisviseClient(app_id="...", secret_key="...", uid="...")
+client = VisviseClient(app_id="...", secret_key="...")
 
 # Step 1: 骨骼架设（直接传裸模型文件，SDK 自动打包）
 rig_id = client.gen_rigging(
     model_path="character.fbx",
     mesh_category="humanoid",
+    rtx="caller_rtx",
 )
-rig = client.wait_model(rig_id, timeout=600)
+rig = client.wait_model(rig_id, timeout=600, rtx="caller_rtx")
 print("骨骼模型：", rig.output_model)
 
 # Step 2: 蒙皮生成（传入带骨骼的模型）
@@ -622,8 +643,9 @@ skin_id = client.gen_skinning(
     model_path="rigged_character.fbx",
     mesh_names=["Body_Mesh"],
     joint_names=["Bip001", "Bip001 Pelvis"],
+    rtx="caller_rtx",
 )
-skin = client.wait_model(skin_id, timeout=600)
+skin = client.wait_model(skin_id, timeout=600, rtx="caller_rtx")
 
 # Step 3: 视频生动画
 anim_id = client.gen_video_motion(
@@ -631,8 +653,9 @@ anim_id = client.gen_video_motion(
     video_path="dance.mp4",
     output_model_format=OutputModelFormat.FBX,
     with_hand=True,
+    rtx="caller_rtx",
 )
-anim = client.wait_model(anim_id, timeout=900)
+anim = client.wait_model(anim_id, timeout=900, rtx="caller_rtx")
 print("动画下载地址：", anim.output_model)
 ```
 
@@ -643,7 +666,7 @@ print("动画下载地址：", anim.output_model)
 ```python
 from visvise import VisviseClient, ReduceFace, FaceType, OutputModelFormat
 
-client = VisviseClient(app_id="...", secret_key="...", uid="...")
+client = VisviseClient(app_id="...", secret_key="...")
 
 model_ids = client.gen_lod(
     model_path="high_model.fbx",
@@ -653,10 +676,11 @@ model_ids = client.gen_lod(
     ],
     output_model_format=OutputModelFormat.FBX,
     gen_times=3,
+    rtx="caller_rtx",
 )
 
 # 等待全部完成
-results = [client.wait_model(mid, timeout=300) for mid in model_ids]
+results = [client.wait_model(mid, timeout=300, rtx="caller_rtx") for mid in model_ids]
 for r in results:
     print(r.model_id, r.output_model)
 ```

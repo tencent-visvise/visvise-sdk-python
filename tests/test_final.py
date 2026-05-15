@@ -13,9 +13,9 @@ from visvise.models import View, ReduceFace
 
 APP_ID = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
-UID        = os.environ["VISVISE_UID"]
+RTX        = os.environ["VISVISE_RTX"]
 ASSETS = Path(__file__).parent / "assets"
-client = VisviseClient(APP_ID, SECRET_KEY, UID)
+client = VisviseClient(APP_ID, SECRET_KEY)
 
 MV_BASE = "https://visvise-weaver-bj-rel-1311802504.cos.accelerate.myqcloud.com/weaver/user-p_5sxfmuvwtfj58ssbt97q2k2kc83697p/Model2026042300225069"
 MV = {k: f"{MV_BASE}/example_gen_360_MultiView(2)_{v}.png"
@@ -26,7 +26,7 @@ all_results = []
 def check(name, mid, expected, timeout=3600):
     print(f"  Checking [{name}] {mid}...", flush=True)
     try:
-        m = client.wait_model(mid, interval=10, timeout=timeout)
+        m = client.wait_model(mid, interval=10, timeout=timeout, rtx=RTX)
         actual = m.params or {}
         ok, issues = True, []
         for kp, ev in expected.items():
@@ -70,51 +70,60 @@ for name, mid, exp in yesterday:
 print("\n=== Step2: 补提交 batch2 第2组 ===", flush=True)
 submit_and_check("mid face_type=2 fbx",
     lambda: client.gen_mid_model(MV["main"],MV["back"],MV["left"],MV["right"],
-        "VISVISE-MeshGen-V1.0.0", face_type=2, output_model_format="fbx", name="opt_mid_b"),
+        "VISVISE-MeshGen-V1.0.0", face_type=2, output_model_format="fbx", name="opt_mid_b",
+        rtx=RTX,),
     {"image_gen_model_params.face_type":2,"image_gen_model_params.output_model_format":"fbx"})
 
 submit_and_check("rtp detail=3 face=1",
     lambda: client.gen_retopology(str(ASSETS/"tex_model.obj"), "hunyuan3D-RTP-v1.5",
-        face_type=1, detail_level=3, output_model_format="fbx", name="opt_rtp_b"),
+        face_type=1, detail_level=3, output_model_format="fbx", name="opt_rtp_b",
+        rtx=RTX,),
     {"re_topology_params.detail_level":3,"re_topology_params.face_type":1})
 
 submit_and_check("uv smooth=False",
     lambda: client.gen_uv(str(ASSETS/"tex_model.obj"), "hunyuan3D-UV-v2.0",
-        enable_auto_smoothing=False, name="opt_uv_b"),
+        enable_auto_smoothing=False, name="opt_uv_b",
+        rtx=RTX,),
     {"uv_params.enable_auto_smoothing":False})
 
 submit_and_check("tex res=2048 uv=True",
     lambda: client.gen_texture(str(ASSETS/"tex_model.obj"), "hunyuan3D-TEX-v2.0",
         input_view=View(main_view=str(ASSETS/"tex_ref_front.jpg")),
-        resolution=2048, unwarp_uv=True, name="opt_tex_b"),
+        resolution=2048, unwarp_uv=True, name="opt_tex_b",
+        rtx=RTX,),
     {"tex_params.resolution":2048,"tex_params.unwarp_uv":True})
 
 # LOD（延长超时）
 submit_and_check("lod gen_times=1",
     lambda: client.gen_lod(str(ASSETS/"tex_model.obj"), "VISVISE-LOD-V1.0.0",
-        [ReduceFace(1,50,2)], output_model_format="fbx", gen_times=1, name="opt_lod_a")[0],
+        [ReduceFace(1,50,2)], output_model_format="fbx", gen_times=1, name="opt_lod_a",
+        rtx=RTX,)[0],
     {"lod_params.output_model_format":"fbx"}, timeout=1200)
 
 # ─── Step3: batch3 动画（串行，各自等待） ────────────────────────────────
 print("\n=== Step3: 动画类测试 ===", flush=True)
 submit_and_check("vm with_hand=True",
     lambda: client.gen_video_motion(str(ASSETS/"animation_model.fbx"),str(ASSETS/"animation_video.mp4"),
-        "VISVISE-FramingAI-Base-V1.5.0", with_hand=True, name="opt_vm_a"),
+        "VISVISE-FramingAI-Base-V1.5.0", with_hand=True, name="opt_vm_a",
+        rtx=RTX,),
     {"framing_ai_params.with_hand":True})
 
 submit_and_check("vm hand=False multi=False",
     lambda: client.gen_video_motion(str(ASSETS/"animation_model.fbx"),str(ASSETS/"animation_video.mp4"),
-        "VISVISE-FramingAI-Base-V1.5.0", with_hand=False, multiple_track=False, name="opt_vm_b"),
+        "VISVISE-FramingAI-Base-V1.5.0", with_hand=False, multiple_track=False, name="opt_vm_b",
+        rtx=RTX,),
     {"framing_ai_params.with_hand":False,"framing_ai_params.multiple_track":False})
 
 submit_and_check("tm prompt=挥手",
     lambda: client.gen_text_motion(str(ASSETS/"animation_model.fbx"), "一个人在挥手打招呼",
-        "VISVISE-TextMotion-V1.1.0", name="opt_tm_a")[0],
+        "VISVISE-TextMotion-V1.1.0", name="opt_tm_a",
+        rtx=RTX,)[0],
     {"framing_ai_params.prompt":"一个人在挥手打招呼"})
 
 submit_and_check("tm prompt=踏步 glb",
     lambda: client.gen_text_motion(str(ASSETS/"animation_model.fbx"), "一个人在原地踏步",
-        "VISVISE-TextMotion-V1.1.0", output_model_format="glb", name="opt_tm_b")[0],
+        "VISVISE-TextMotion-V1.1.0", output_model_format="glb", name="opt_tm_b",
+        rtx=RTX,)[0],
     {"framing_ai_params.prompt":"一个人在原地踏步","framing_ai_params.output_model_format":"glb"})
 
 # ─── FINAL SUMMARY ──────────────────────────────────────────────────────

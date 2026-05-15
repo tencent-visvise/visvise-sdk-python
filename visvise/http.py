@@ -46,20 +46,27 @@ BASE_URL: str = Environment.PROD.value
 
 
 class WeaverHTTPClient:
-    """底层 HTTP 客户端，封装签名计算和统一错误处理。"""
+    """底层 HTTP 客户端，封装签名计算和统一错误处理。
+
+    .. note::
+
+       签名 header 中的 ``rtx`` 表示**实际使用人**的 RTX（公司账号）。按照公司合规
+       要求，**内部用户调用时必须传入实际使用人的 rtx**，不可使用项目账号或共享账号
+       的 RTX 代替；外部用户可传任意业务标识。
+
+       ``rtx`` 是请求级字段，不在 client 初始化时绑定，每次接口调用单独传入。
+    """
 
     def __init__(
         self,
         app_id: str,
         secret_key: str,
-        uid: str,
         base_url: str | Environment = Environment.PROD,
         timeout: int = 30,
     ):
         # 兼容 Environment 枚举和自定义字符串
         self.app_id = app_id
         self.secret_key = secret_key
-        self.uid = uid
         self.base_url = (base_url.value if isinstance(base_url, Environment) else base_url).rstrip("/")
         self.timeout = timeout
         self._session = requests.Session()
@@ -78,13 +85,18 @@ class WeaverHTTPClient:
             hashlib.sha256,
         ).hexdigest()
 
-    def _headers_with_body_str(self, body_str: str) -> dict:
+    def _headers_with_body_str(self, body_str: str, rtx: str) -> dict:
+        if not rtx:
+            raise ValueError(
+                "rtx 不能为空。按照公司要求，内部用户必须传入实际使用人的 rtx；"
+                "外部用户可传业务标识。"
+            )
         ts = str(int(time.time()))
         sign = self._sign(body_str, ts)
         headers = {
             "Content-Type": "application/json",
             "app_id": self.app_id,
-            "uid": self.uid,
+            "rtx": rtx,
             "ts": ts,
             "sign": sign,
         }
@@ -94,15 +106,22 @@ class WeaverHTTPClient:
     # 请求
     # ──────────────────────────────────────────
 
-    def post(self, path: str, body: dict | None = None) -> Any:
+    def post(self, path: str, body: dict | None = None, *, rtx: str) -> Any:
         """发送 POST 请求，自动签名，统一处理错误码。
+
+        Args:
+            path: 接口路径。
+            body: 请求体。
+            rtx: 实际使用人的 RTX（公司账号）。**必填**——按公司合规要求，
+                内部用户必须传实际使用人的 RTX，不可代填。
 
         Returns:
             响应 data 字段（已解包），如无 data 则返回 None。
 
         Raises:
-            NetworkError: 网络层异常
-            WeaverError / 子类: 业务错误码异常
+            ValueError: rtx 为空。
+            NetworkError: 网络层异常。
+            WeaverError / 子类: 业务错误码异常。
         """
         if body is None:
             body = {}
@@ -110,7 +129,7 @@ class WeaverHTTPClient:
 
         # 序列化一次，签名和发送共用同一份字符串，确保一致
         body_str = json.dumps(body, ensure_ascii=False, separators=(",", ":"))
-        headers = self._headers_with_body_str(body_str)
+        headers = self._headers_with_body_str(body_str, rtx)
 
         logger.debug("POST %s body=%s", url, body_str[:200])
 
@@ -158,7 +177,14 @@ class WeaverHTTPClient:
     # SSE 请求（用于 init_segment 等流式接口）
     # ──────────────────────────────────────────
 
-    def post_sse(self, path: str, body: dict | None = None, *, read_timeout: int | None = 1200):
+    def post_sse(
+        self,
+        path: str,
+        body: dict | None = None,
+        *,
+        rtx: str,
+        read_timeout: int | None = 1200,
+    ):
         """发送 POST 请求并以 SSE 流方式返回事件帧。
 
         每帧 yield 一个 dict：``{"event": str, "data": Any}``，``data`` 在可解析为 JSON
@@ -167,18 +193,20 @@ class WeaverHTTPClient:
         Args:
             path: 接口路径。
             body: 请求体。
+            rtx: 实际使用人的 RTX（公司账号）。**必填**。
             read_timeout: SSE 读超时（秒），默认 1200s（20 分钟）。SSE 流式接口可能持续较久
                 （如 2D 拆分需要逐个部件分割），单独设置较长超时；连接超时仍使用 client 的 timeout。
 
         Raises:
-            NetworkError: 网络异常 / 非 SSE 响应
+            ValueError: rtx 为空。
+            NetworkError: 网络异常 / 非 SSE 响应。
         """
         if body is None:
             body = {}
         url = f"{self.base_url}/{path.lstrip('/')}"
 
         body_str = json.dumps(body, ensure_ascii=False, separators=(",", ":"))
-        headers = self._headers_with_body_str(body_str)
+        headers = self._headers_with_body_str(body_str, rtx)
         headers["Accept"] = "text/event-stream"
 
         logger.debug("POST(SSE) %s body=%s", url, body_str[:200])

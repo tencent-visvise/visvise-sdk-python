@@ -23,12 +23,12 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
 )
 
-APP_ID     = "vsa_fca6bd1f7254476c"
-SECRET_KEY = "vss_d375e248b3ecd3b4cd66d30a00492189cc997db97ad0edbb"
-UID        = "willzhen"
+APP_ID = os.environ["VISVISE_APP_ID"]
+SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
+RTX = os.environ["VISVISE_RTX"]
 ASSETS     = Path(__file__).parent / "assets"
 
-client = VisviseClient(APP_ID, SECRET_KEY, UID, env=Environment.DEV)
+client = VisviseClient(APP_ID, SECRET_KEY, env=Environment.DEV)
 
 
 def read_bytes(p: str) -> bytes:
@@ -72,6 +72,7 @@ print("=" * 70)
 run("gen_360 (PNG bytes)", lambda: client.gen_360(
     main_view=read_bytes("main_view.png"),
     name="sniff_test_gen_360",
+    rtx=RTX,
 ))
 
 # 2. gen_high_model：四视图（主视图必传，背/左/右可选），全用 bytes
@@ -83,6 +84,7 @@ run("gen_high_model (4×PNG bytes)", lambda: client.gen_high_model(
     output_model_format=OutputModelFormat.FBX,
     face_type=FaceType.TRIANGLE,
     name="sniff_test_gen_high",
+    rtx=RTX,
 ))
 
 # 3. gen_retopology：模型 bytes 输入 FBX → 应识别为 .fbx 并打包 zip
@@ -93,12 +95,14 @@ run("gen_retopology (FBX bytes)", lambda: client.gen_retopology(
     face_type=FaceType.QUAD,
     detail_level=DetailLevel.MEDIUM,
     name="sniff_test_gen_retop",
+    rtx=RTX,
 ))
 
 # 4. gen_uv：OBJ bytes 输入 → 应识别为 .obj 并打包 zip
 run("gen_uv (OBJ bytes)", lambda: client.gen_uv(
     model_path=read_bytes("tex_model.obj"),
     name="sniff_test_gen_uv",
+    rtx=RTX,
 ))
 
 # 5. gen_video_motion：FBX 模型 + MP4 视频，全部 bytes
@@ -107,6 +111,7 @@ run("gen_video_motion (FBX + MP4 bytes)", lambda: client.gen_video_motion(
     video_path=read_bytes("animation_video.mp4"),
     output_model_format=OutputModelFormat.FBX,
     name="sniff_test_gen_video_motion",
+    rtx=RTX,
 ))
 
 # ──────────────────────────────────────────────────────────────────────

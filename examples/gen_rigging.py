@@ -15,7 +15,7 @@ from visvise import Environment, VisviseClient
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
-UID        = os.environ["VISVISE_UID"]
+RTX        = os.environ["VISVISE_RTX"]
 ENV        = os.environ.get("VISVISE_ENV", "prod")
 ENV_MAP    = {"prod": Environment.PROD, "test": Environment.TEST, "dev": Environment.DEV}
 
@@ -23,7 +23,7 @@ ASSETS = Path(__file__).parent / "assets"
 
 
 def main():
-    client = VisviseClient(APP_ID, SECRET_KEY, UID, env=ENV_MAP[ENV])  # noqa
+    client = VisviseClient(APP_ID, SECRET_KEY, env=ENV_MAP[ENV])  # noqa
 
     print("[gen_rigging] 开始骨骼架设...")
 
@@ -34,10 +34,11 @@ def main():
         algorithm_model="VISVISE-GoRigging-V1.0.0",
         mesh_category="humanoid",           # humanoid（人形）或 tetrapod（四足）
         name="example_gen_rigging",
+        rtx=RTX,
     )
     print(f"[gen_rigging] 任务已创建，model_id={model_id}")
 
-    model = client.wait_model(model_id, interval=5, timeout=600)
+    model = client.wait_model(model_id, interval=5, timeout=600, rtx=RTX)
     print(f"[gen_rigging] 生成成功！耗时 {model.time_cost}s")
     print(f"  output_model : {model.output_model}")
 
