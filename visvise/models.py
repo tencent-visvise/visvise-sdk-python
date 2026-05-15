@@ -80,6 +80,22 @@ class SegmentGranularity:
     FINE = 3        # 细（×100%）
 
 
+class ImageGen360Style:
+    """图生 360 风格枚举 (style)。
+
+    仅 VISVISE 自研模型支持；服务端只接受以下固定值，传其它自定义值会被服务端拒绝。
+    不传则不做风格转换。
+    """
+    GRAY_MODEL = "灰模"
+    PHOTOREAL = "超写实"
+    Q_TOON = "Q版卡通"
+    PIXEL = "像素风格"
+
+    @classmethod
+    def values(cls) -> tuple[str, ...]:
+        return (cls.GRAY_MODEL, cls.PHOTOREAL, cls.Q_TOON, cls.PIXEL)
+
+
 # ──────────────────────────────────────────────
 # 公共请求结构
 # ──────────────────────────────────────────────

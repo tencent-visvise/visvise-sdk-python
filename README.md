@@ -125,7 +125,10 @@ client = VisviseClient(
 SDK 提供以下枚举常量，推荐使用枚举替代硬编码数字/字符串：
 
 ```python
-from visvise import FaceType, DetailLevel, OutputModelFormat, MeshRefineMode, SegmentSplitType, SegmentGranularity
+from visvise import (
+    FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
+    SegmentSplitType, SegmentGranularity, ImageGen360Style,
+)
 
 # 面数类型
 FaceType.TRIANGLE  # 1 - 三角面
@@ -153,6 +156,12 @@ SegmentSplitType.FOUR_VIEW   # 2 - 生成四视图拆分
 SegmentGranularity.COARSE   # 1 - 粗
 SegmentGranularity.MEDIUM   # 2 - 中（默认）
 SegmentGranularity.FINE     # 3 - 细
+
+# 图生 360 风格（仅 VISVISE 自研模型支持，传其它值会被服务端拒绝）
+ImageGen360Style.GRAY_MODEL  # "灰模"
+ImageGen360Style.PHOTOREAL   # "超写实"
+ImageGen360Style.Q_TOON      # "Q版卡通"
+ImageGen360Style.PIXEL       # "像素风格"
 ```
 
 ---
@@ -191,7 +200,7 @@ model_id = client.gen_360(
     algorithm_model=None,                # 可选，算法模型名（如 "hunyuan3D-MultiView-v3.0"）；不传则自动选首个可用模型
     name="gen_360",                      # 可选，任务名称
     enable_a_pose=None,                  # 可选，是否开启 A-Pose（True/False）
-    style=None,                          # 可选，风格类型（仅 VISVISE 自研模型支持）：灰模/超写实/Q版卡通/像素风格
+    style=None,                          # 可选，风格类型（仅 VISVISE 自研模型支持），只接受 ImageGen360Style 枚举：GRAY_MODEL/PHOTOREAL/Q_TOON/PIXEL，传其他值会报错
     back_view=None,                      # 可选，背视图，提升生成质量
     left_view=None,                      # 可选，左视图
     right_view=None,                     # 可选，右视图

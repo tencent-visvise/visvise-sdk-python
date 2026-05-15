@@ -22,6 +22,7 @@ from .exceptions import ModelGenerationError, PollingTimeoutError, WeaverError
 from .http import Environment, WeaverHTTPClient
 from .models import (
     GetCosCredResult,
+    ImageGen360Style,
     ModelInfo,
     ModelStatus,
     NodeType,
@@ -641,15 +642,29 @@ class VisviseClient:
                 可选，若不传则自动获取当前账号可用的第一个模型。
             name: 任务名称。
             enable_a_pose: 是否开启 A-Pose。
-            style: 风格类型（仅 VISVISE 自研模型支持）。
+            style: 风格类型（仅 VISVISE 自研模型支持）。**只接受固定枚举值**，
+                参考 :class:`~visvise.models.ImageGen360Style`：
+
+                - ``ImageGen360Style.GRAY_MODEL``  ("灰模")
+                - ``ImageGen360Style.PHOTOREAL``   ("超写实")
+                - ``ImageGen360Style.Q_TOON``      ("Q版卡通")
+                - ``ImageGen360Style.PIXEL``       ("像素风格")
+
+                传其它自定义值会被服务端拒绝；不传则不做风格转换。
             back_view / left_view / right_view: 可选的额外视图，同样支持三种输入形式。
 
         Returns:
             新生成的模型 ID。
 
         Raises:
+            ValueError: ``style`` 不在允许列表内。
             WeaverError / 子类
         """
+        if style is not None and style not in ImageGen360Style.values():
+            raise ValueError(
+                f"style 仅支持 {ImageGen360Style.values()}，传入了 {style!r}。"
+                f"请使用 ImageGen360Style 枚举常量。"
+            )
         view = View(
             main_view=self._resolve_file(main_view),
             back_view=self._resolve_file(back_view) if back_view is not None else None,

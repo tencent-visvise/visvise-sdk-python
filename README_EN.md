@@ -125,7 +125,10 @@ client = VisviseClient(
 The SDK exposes the following enum constants. Prefer them over hard-coded numbers/strings:
 
 ```python
-from visvise import FaceType, DetailLevel, OutputModelFormat, MeshRefineMode, SegmentSplitType, SegmentGranularity
+from visvise import (
+    FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
+    SegmentSplitType, SegmentGranularity, ImageGen360Style,
+)
 
 # Face type
 FaceType.TRIANGLE  # 1 - triangle faces
@@ -153,6 +156,12 @@ SegmentSplitType.FOUR_VIEW   # 2 - four-view split
 SegmentGranularity.COARSE   # 1 - coarse
 SegmentGranularity.MEDIUM   # 2 - medium (default)
 SegmentGranularity.FINE     # 3 - fine
+
+# Image-to-360 style (VISVISE proprietary models only; any other value will be rejected)
+ImageGen360Style.GRAY_MODEL  # "灰模"      - gray model
+ImageGen360Style.PHOTOREAL   # "超写实"    - photoreal
+ImageGen360Style.Q_TOON      # "Q版卡通"  - Q-style toon
+ImageGen360Style.PIXEL       # "像素风格" - pixel art
 ```
 
 ---
@@ -191,7 +200,7 @@ model_id = client.gen_360(
     algorithm_model=None,                # optional, e.g. "hunyuan3D-MultiView-v3.0"; auto-selected if omitted
     name="gen_360",                      # optional, task name
     enable_a_pose=None,                  # optional, enable A-Pose (True/False)
-    style=None,                          # optional, style (VISVISE proprietary models only): grayscale / photoreal / Q-toon / pixel
+    style=None,                          # optional, style (VISVISE proprietary models only). Must be one of ImageGen360Style: GRAY_MODEL/PHOTOREAL/Q_TOON/PIXEL — any other value will be rejected
     back_view=None,                      # optional, back view to improve quality
     left_view=None,                      # optional, left view
     right_view=None,                     # optional, right view
