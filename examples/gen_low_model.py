@@ -28,7 +28,7 @@ def main():
 
     model_id = client.gen_low_model(
         main_view=str(ASSETS / "main_view.png"),
-        algorithm_model="Tripo-v1.0-快速生成",
+        algorithm_model=None,
         output_model_format=OutputModelFormat.FBX,
         face_type=FaceType.TRIANGLE,
         name="example_gen_low_model",
