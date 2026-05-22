@@ -46,16 +46,14 @@ def main():
         right_view = None
 
     # 高模用第 2 个算法模型（不依赖多图）
-    algorithm_model = "Tripo-v3.1-ultra"
 
-    print(f"[gen_high_model] algorithm_model={algorithm_model}")
     print("[gen_high_model] 开始生成高模...")
     model_id = client.gen_high_model(
         main_view=main_view,
         back_view=back_view,
         left_view=left_view,
         right_view=right_view,
-        algorithm_model=algorithm_model,
+        algorithm_model=None,
         output_model_format=OutputModelFormat.FBX,
         face_type=FaceType.TRIANGLE,
         name="example_gen_high_model",
