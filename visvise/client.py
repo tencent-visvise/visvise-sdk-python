@@ -718,6 +718,7 @@ class VisviseClient:
         back_view: Optional[FileInput] = None,
         left_view: Optional[FileInput] = None,
         right_view: Optional[FileInput] = None,
+        enable_pbr: Optional[bool] = None,
     ) -> str:
         """图生高模（node_type=3）。
 
@@ -731,6 +732,7 @@ class VisviseClient:
             name: 任务名称。
             face_num: 面数，取值范围 1000~1500000，不传自动配置。
             back_view / left_view / right_view: 额外视图，同样支持三种输入形式。
+            enable_pbr: 是否启用 PBR，可选。
 
         Returns:
             新生成的模型 ID。
@@ -749,6 +751,8 @@ class VisviseClient:
         }
         if face_num is not None:
             img_params["face_num"] = face_num
+        if enable_pbr is not None:
+            img_params["enable_pbr"] = enable_pbr
 
         return self.api.gen_3d_model(
             name=name,
