@@ -767,9 +767,9 @@ class VisviseClient:
     def gen_mid_model(
         self,
         main_view: FileInput,
-        back_view: FileInput,
-        left_view: FileInput,
-        right_view: FileInput,
+        back_view: Optional[FileInput] = None,
+        left_view: Optional[FileInput] = None,
+        right_view: Optional[FileInput] = None,
         algorithm_model: Optional[str] = None,
         output_model_format: str = "fbx",
         face_type: int = 1,
@@ -777,13 +777,17 @@ class VisviseClient:
         *,
         rtx: str,
         segment_model_id: Optional[str] = None,
+        model_id_360: Optional[str] = None,
     ) -> str:
         """图生中模（node_type=11）。
 
-        注意：中模要求四视图全部必传。
+        注意：当 segment_model_id 和 model_id_360 均未传入时，四视图为必传；
+        当 segment_model_id 或 model_id_360 有值时，视图参数可选传入。
 
         Args:
-            main_view / back_view / left_view / right_view: 四视图，均支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+            main_view: 主视图，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
+            back_view / left_view / right_view: 可选额外视图，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
                 bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
             algorithm_model: 算法模型（可通过 list_algorithm_model(node_type=11) 获取）。
                 可选，若不传则自动获取当前账号可用的第一个模型。
@@ -791,16 +795,24 @@ class VisviseClient:
             face_type: 面数类型，默认 1。
             name: 任务名称。
             segment_model_id: 2D 分割资产 ID，传入后将基于分割结果生成模型。
+            model_id_360: 360 模型资产 ID，传入后将基于 360 模型生成中模。
 
         Returns:
             新生成的模型 ID。
         """
-        view = View(
-            main_view=self._resolve_file(main_view, rtx=rtx),
-            back_view=self._resolve_file(back_view, rtx=rtx),
-            left_view=self._resolve_file(left_view, rtx=rtx),
-            right_view=self._resolve_file(right_view, rtx=rtx),
-        )
+        view = View()
+        if model_id_360 is None and segment_model_id is None:
+            # Resolve main view (required)
+            view.main_view = self._resolve_file(main_view, rtx=rtx)
+            # Resolve back view
+            if back_view is not None:
+                view.back_view = self._resolve_file(back_view, rtx=rtx)
+            # Resolve left view
+            if left_view is not None:
+                view.left_view = self._resolve_file(left_view, rtx=rtx)
+            # Resolve right view
+            if right_view is not None:
+                view.right_view = self._resolve_file(right_view, rtx=rtx)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_MID, rtx=rtx)
         img_params: dict = {
             "algorithm_model": resolved_model,
@@ -809,6 +821,8 @@ class VisviseClient:
         }
         if segment_model_id is not None:
             img_params["segment_model_id"] = segment_model_id
+        if model_id_360 is not None:
+            img_params["model_id_360"] = model_id_360
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.IMG_TO_3D_MID,
