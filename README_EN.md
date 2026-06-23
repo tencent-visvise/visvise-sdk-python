@@ -239,15 +239,16 @@ Mid-poly generation requires all four views (node_type=11). → [Example](exampl
 
 ```python
 model_id = client.gen_mid_model(
-    main_view="path/to/main.png",                 # required (all four views are required)
-    back_view="path/to/back.png",                 # required
-    left_view="path/to/left.png",                 # required
-    right_view="path/to/right.png",               # required
-    algorithm_model=None,                          # optional, e.g. "VISVISE-MeshGen-V1.0.0"
-    output_model_format=OutputModelFormat.FBX,    # optional, output format
+    main_view="path/to/main.png",                 # required if uploading original art view
+    back_view="path/to/back.png",                 # optional
+    left_view="path/to/left.png",                 # optional
+    right_view="path/to/right.png",               # optional
+    algorithm_model=None,                         # optional, e.g. "VISVISE-MeshGen-V1.0.0"; auto-selected if omitted
+    output_model_format=OutputModelFormat.FBX,    # optional, output format (default fbx)
     face_type=FaceType.TRIANGLE,                  # optional, face type
-    name="gen_mid_model",                          # optional, task name
-    segment_model_id=None,                         # optional, 2D segmentation asset ID (mid-poly only),
+    name="gen_mid_model",                         # optional, task name
+    segment_model_id=None,                        # optional, 2D segmentation asset ID (mid-poly only), generate from 2D segmentation result
+    model_id_360=None,                            # optional, gen_360 asset ID, generate from gen_360 result
     rtx="caller_rtx",
 )
 ```

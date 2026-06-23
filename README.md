@@ -239,15 +239,16 @@ model_id = client.gen_high_model(
 
 ```python
 model_id = client.gen_mid_model(
-    main_view="path/to/main.png",                 # 必填，四视图全部必传
-    back_view="path/to/back.png",                 # 必填
-    left_view="path/to/left.png",                 # 必填
-    right_view="path/to/right.png",               # 必填
-    algorithm_model=None,                          # 可选，如 "VISVISE-MeshGen-V1.0.0"；不传则自动选首个可用模型
+    main_view="path/to/main.png",                 # 必填，若是用户上传原画视图，则必填
+    back_view="path/to/back.png",                 # 可选
+    left_view="path/to/left.png",                 # 可选
+    right_view="path/to/right.png",               # 可选
+    algorithm_model=None,                         # 可选，如 "VISVISE-MeshGen-V1.0.0"；不传则自动选首个可用模型
     output_model_format=OutputModelFormat.FBX,    # 可选，输出格式（默认 fbx）
     face_type=FaceType.TRIANGLE,                  # 可选，面数类型
-    name="gen_mid_model",                          # 可选，任务名称
-    segment_model_id=None,                         # 可选，2D 分割资产 ID（仅中模有效），用于基于分割结果生成,
+    name="gen_mid_model",                         # 可选，任务名称
+    segment_model_id=None,                        # 可选，2D 分割资产 ID（仅中模有效），用于基于2D分割结果生成
+    model_id_360=None,                                # 可选，图生360资产 ID，用于基于图生360结果生成
     rtx="caller_rtx",
 )
 ```
