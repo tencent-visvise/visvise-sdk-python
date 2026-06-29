@@ -1129,6 +1129,11 @@ class VisviseClient:
         *,
         rtx: str,
         template_skeleton: Optional[FileInput] = None,
+        mesh_names: Optional[list[str]] = None,
+        generate_root: bool = False,
+        algo_scenario: Optional[int] = None,
+        temperature: float = -1,
+        num_beams: int = -1,
     ) -> str:
         """骨骼架设（node_type=5）。
 
@@ -1145,7 +1150,11 @@ class VisviseClient:
             name: 任务名称。
             template_skeleton: 模板骨骼，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
                 可选，传入后将基于该模板骨骼进行架设。
-
+            mesh_names:  需要骨骼架设的网格名称列表
+            generate_root: 是否生成root骨骼
+            temperature:  高级采用-自由度 取值范围(0~1)            
+            num_beams:   高级采用-搜索广度  取值范围(5~15)
+            algo_scenario: 生成方式 , mesh_category=humanoid 时设置 1=默认一键自动生成；2=人形角色+上传模版；3=主体骨骼人形角色生成附加骨骼。只有2需要传模板           
         Returns:
             新生成的模型 ID。
         """
@@ -1155,7 +1164,14 @@ class VisviseClient:
             "config": {
                 "mesh_category": mesh_category,
                 "algo_name": resolved_model,
-            }
+                "generate_root": generate_root,
+                "temperature": temperature,
+                "num_beams": num_beams,
+                "algo_scenario": algo_scenario,
+            },
+            "selection": {
+                "mesh_names": mesh_names,
+            },
         }
 
         # 2. 组装 zip（兼容裸模型文件和已是 zip 的输入）

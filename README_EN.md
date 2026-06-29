@@ -382,7 +382,15 @@ model_id = client.gen_rigging(
     algorithm_model=None,                          # optional, e.g. "VISVISE-GoRigging-V1.0.0"
     mesh_category="humanoid",                     # optional, "humanoid" (default) or "tetrapod"
     name="gen_rigging",                            # optional, task name
-    template_skeleton=None,                        # optional, template skeleton to base the rig on,
+    template_skeleton=None,                        # optional, template skeleton to base the rig on
+    mesh_names=None,                               # optional, mesh names list to rig
+    generate_root=False,                           # optional, whether to generate root bone (default False)
+    temperature=-1,                                # optional, advanced sampling - freedom, range 0~1 (default -1)
+    num_beams=-1,                                  # optional, advanced sampling - search breadth, range 5~15 (default -1)
+    algo_scenario=None,                            # optional, generation mode (only for mesh_category=humanoid):
+                                                   #   1 = default one-click auto generation
+                                                   #   2 = humanoid + template (requires template_skeleton)
+                                                   #   3 = main body humanoid rig with additional bones
     rtx="caller_rtx",
 )
 ```

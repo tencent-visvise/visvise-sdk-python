@@ -33,6 +33,8 @@ def main():
         model_path=str(ASSETS / "rigging_model.fbx"),
         algorithm_model="VISVISE-GoRigging-V1.0.0",
         mesh_category="humanoid",           # humanoid（人形）或 tetrapod（四足）
+        temperature=0.5,
+        generate_root=True,
         name="example_gen_rigging",
         rtx=RTX,
     )
