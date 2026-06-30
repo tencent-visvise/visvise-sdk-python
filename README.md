@@ -239,15 +239,16 @@ model_id = client.gen_high_model(
 
 ```python
 model_id = client.gen_mid_model(
-    main_view="path/to/main.png",                 # 必填，四视图全部必传
-    back_view="path/to/back.png",                 # 必填
-    left_view="path/to/left.png",                 # 必填
-    right_view="path/to/right.png",               # 必填
-    algorithm_model=None,                          # 可选，如 "VISVISE-MeshGen-V1.0.0"；不传则自动选首个可用模型
+    main_view="path/to/main.png",                 # 必填，若是用户上传原画视图，则必填
+    back_view="path/to/back.png",                 # 可选
+    left_view="path/to/left.png",                 # 可选
+    right_view="path/to/right.png",               # 可选
+    algorithm_model=None,                         # 可选，如 "VISVISE-MeshGen-V1.0.0"；不传则自动选首个可用模型
     output_model_format=OutputModelFormat.FBX,    # 可选，输出格式（默认 fbx）
     face_type=FaceType.TRIANGLE,                  # 可选，面数类型
-    name="gen_mid_model",                          # 可选，任务名称
-    segment_model_id=None,                         # 可选，2D 分割资产 ID（仅中模有效），用于基于分割结果生成,
+    name="gen_mid_model",                         # 可选，任务名称
+    segment_model_id=None,                        # 可选，2D 分割资产 ID（仅中模有效），用于基于2D分割结果生成
+    model_id_360=None,                                # 可选，图生360资产 ID，用于基于图生360结果生成
     rtx="caller_rtx",
 )
 ```
@@ -381,7 +382,15 @@ model_id = client.gen_rigging(
     algorithm_model=None,                          # 可选，如 "VISVISE-GoRigging-V1.0.0"
     mesh_category="humanoid",                     # 可选，"humanoid"（人形，默认）或 "tetrapod"（四足）
     name="gen_rigging",                            # 可选，任务名称
-    template_skeleton=None,                        # 可选，模板骨骼，传入后将基于该模板进行架设,
+    template_skeleton=None,                        # 可选，模板骨骼，传入后将基于该模板进行架设
+    mesh_names=None,                               # 可选，需要骨骼架设的网格名称列表
+    generate_root=False,                           # 可选，是否生成 root 骨骼（默认 False）
+    temperature=-1,                                # 可选，高级采样-自由度，取值范围 0~1（默认 -1）
+    num_beams=-1,                                  # 可选，高级采样-搜索广度，取值范围 5~15（默认 -1）
+    algo_scenario=None,                            # 可选，生成方式（仅 mesh_category=humanoid 时有效）：
+                                                   #   1 = 默认一键自动生成
+                                                   #   2 = 人形角色+上传模版（需同时传 template_skeleton）
+                                                   #   3 = 主体骨骼人形角色生成附加骨骼
     rtx="caller_rtx",
 )
 ```
