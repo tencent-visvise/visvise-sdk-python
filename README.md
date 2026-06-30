@@ -44,13 +44,13 @@ VISVISE Weaver OpenAPI 的 Python SDK，提供：
 直接从 GitHub 仓库安装（包含 COS 上传依赖）：
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.1.0
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.1.1
 ```
 
 或通过 SSH：
 
 ```bash
-pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.1.0
+pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.1.1
 ```
 
 > **注：** 安装后即包含腾讯云 COS SDK，可直接使用本地文件自动上传功能，无需额外安装。
