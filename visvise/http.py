@@ -237,6 +237,32 @@ class WeaverHTTPClient:
         # 强制使用 UTF-8 解码，避免服务端响应头 charset 缺失或错误时出现乱码
         resp.encoding = "utf-8"
 
+        # 检查响应类型，兼容普通 JSON 返回
+        content_type = resp.headers.get('Content-Type', '').lower()
+        if 'text/event-stream' not in content_type:
+            # 服务端返回普通 JSON，包装成 SSE 格式
+            logger.debug("检测到普通 JSON 响应，进行兼容处理")
+            try:
+                result = resp.json()
+                code = result.get("code", -1)
+                req_id = result.get("req_id", "")
+                msg = result.get("msg", "unknown error")
+
+                logger.debug("Response code=%s req_id=%s", code, req_id)
+
+                if code != 0:
+                    raise_for_code(code, msg, req_id)
+
+                data = result.get("data")
+                # 包装成 SSE 事件帧格式
+                yield {"event": "reply", "data": data}
+                return
+            except ValueError as e:
+                raise NetworkError(
+                    f"JSON 响应解析失败 [{resp.status_code}]: body={(resp.text or '')[:500]!r}"
+                ) from e
+
+        # 以下是原有的 SSE 处理逻辑
         event = None
         data_lines: list[str] = []
         for raw_line in resp.iter_lines(decode_unicode=True):

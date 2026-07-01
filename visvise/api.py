@@ -442,5 +442,4 @@ class VisviseAPI:
             body["granularity"] = granularity
         if prompt is not None:
             body["prompt"] = prompt
-
         return self._http.post_sse("openapi/weaver/component/init_segment", body, rtx=rtx)
