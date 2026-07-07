@@ -176,12 +176,17 @@ class GetCosCredResult:
 @dataclass
 class UserQuota:
     """get_user_quota 接口响应"""
-    quota: int
+    model_quota: int
+    animation_quota: int
     server_ts: int
 
     @classmethod
     def from_dict(cls, d: dict) -> "UserQuota":
-        return cls(quota=d["quota"], server_ts=d["server_ts"])
+        return cls(
+            model_quota=d["model_quota"],
+            animation_quota=d["animation_quota"],
+            server_ts=d["server_ts"],
+        )
 
 
 @dataclass

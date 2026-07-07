@@ -532,7 +532,8 @@ cred = client.api.get_cos_cred(rtx="caller_rtx")
 
 # Query remaining quota
 quota = client.api.get_user_quota(rtx="caller_rtx")
-print(quota.quota)  # remaining count
+print(quota.model_quota)  # remaining model count
+print(quota.animation_quota)  # remaining animation count
 
 # Fetch model list
 models, total = client.api.get_model_list(

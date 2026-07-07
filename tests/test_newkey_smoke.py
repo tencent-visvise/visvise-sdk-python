@@ -46,7 +46,7 @@ print("=" * 70)
 # 0. 先看下账号配额
 try:
     quota = client.api.get_user_quota(rtx=RTX)
-    print(f"\n剩余配额: {quota.quota}, 服务器时间戳: {quota.server_ts}\n")
+    print(f"\n模型配额: {quota.model_quota}, 动画配额: {quota.animation_quota}, 服务器时间戳: {quota.server_ts}\n")
 except Exception as e:
     print(f"\n⚠️  查配额失败: {e}\n")
 

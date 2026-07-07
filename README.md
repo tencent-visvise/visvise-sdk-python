@@ -532,7 +532,8 @@ cred = client.api.get_cos_cred(rtx="caller_rtx")
 
 # 查询剩余配额
 quota = client.api.get_user_quota(rtx="caller_rtx")
-print(quota.quota)  # 剩余次数
+print(quota.model_quota)  # 模型剩余次数
+print(quota.animation_quota)  # 动画剩余次数
 
 # 拉取模型列表
 models, total = client.api.get_model_list(
