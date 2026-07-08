@@ -44,13 +44,13 @@ Python SDK for the VISVISE Weaver OpenAPI. It provides:
 Install directly from the GitHub repository (Tencent Cloud COS dependency included):
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.3
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.1.1
 ```
 
 Or via SSH:
 
 ```bash
-pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.0.3
+pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.1.1
 ```
 
 > **Note:** The Tencent Cloud COS SDK is bundled by default; local file auto-upload works out of the box.
@@ -382,7 +382,15 @@ model_id = client.gen_rigging(
     algorithm_model=None,                          # optional, e.g. "VISVISE-GoRigging-V1.0.0"
     mesh_category="humanoid",                     # optional, "humanoid" (default) or "tetrapod"
     name="gen_rigging",                            # optional, task name
-    template_skeleton=None,                        # optional, template skeleton to base the rig on,
+    template_skeleton=None,                        # optional, template skeleton to base the rig on
+    mesh_names=None,                               # optional, mesh names list to rig
+    generate_root=False,                           # optional, whether to generate root bone (default False)
+    temperature=-1,                                # optional, advanced sampling - freedom, range 0~1 (default -1)
+    num_beams=-1,                                  # optional, advanced sampling - search breadth, range 5~15 (default -1)
+    algo_scenario=None,                            # optional, generation mode (only for mesh_category=humanoid):
+                                                   #   1 = default one-click auto generation
+                                                   #   2 = humanoid + template (requires template_skeleton)
+                                                   #   3 = main body humanoid rig with additional bones
     rtx="caller_rtx",
 )
 ```
@@ -524,7 +532,8 @@ cred = client.api.get_cos_cred(rtx="caller_rtx")
 
 # Query remaining quota
 quota = client.api.get_user_quota(rtx="caller_rtx")
-print(quota.quota)  # remaining count
+print(quota.model_quota)  # remaining model count
+print(quota.animation_quota)  # remaining animation count
 
 # Fetch model list
 models, total = client.api.get_model_list(

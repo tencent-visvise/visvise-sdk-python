@@ -11,6 +11,12 @@ import os
 import sys
 from pathlib import Path
 
+import logging
+logging.basicConfig(level=logging.DEBUG)  # 查看详细请求/响应日志
+
+# 或只开启 visvise 相关日志
+logging.getLogger("visvise").setLevel(logging.INFO)
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from visvise import Environment, VisviseClient, SegmentSplitType, SegmentGranularity

@@ -44,13 +44,13 @@ VISVISE Weaver OpenAPI 的 Python SDK，提供：
 直接从 GitHub 仓库安装（包含 COS 上传依赖）：
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.3
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.1.1
 ```
 
 或通过 SSH：
 
 ```bash
-pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.0.3
+pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.1.1
 ```
 
 > **注：** 安装后即包含腾讯云 COS SDK，可直接使用本地文件自动上传功能，无需额外安装。
@@ -382,7 +382,15 @@ model_id = client.gen_rigging(
     algorithm_model=None,                          # 可选，如 "VISVISE-GoRigging-V1.0.0"
     mesh_category="humanoid",                     # 可选，"humanoid"（人形，默认）或 "tetrapod"（四足）
     name="gen_rigging",                            # 可选，任务名称
-    template_skeleton=None,                        # 可选，模板骨骼，传入后将基于该模板进行架设,
+    template_skeleton=None,                        # 可选，模板骨骼，传入后将基于该模板进行架设
+    mesh_names=None,                               # 可选，需要骨骼架设的网格名称列表
+    generate_root=False,                           # 可选，是否生成 root 骨骼（默认 False）
+    temperature=-1,                                # 可选，高级采样-自由度，取值范围 0~1（默认 -1）
+    num_beams=-1,                                  # 可选，高级采样-搜索广度，取值范围 5~15（默认 -1）
+    algo_scenario=None,                            # 可选，生成方式（仅 mesh_category=humanoid 时有效）：
+                                                   #   1 = 默认一键自动生成
+                                                   #   2 = 人形角色+上传模版（需同时传 template_skeleton）
+                                                   #   3 = 主体骨骼人形角色生成附加骨骼
     rtx="caller_rtx",
 )
 ```
@@ -524,7 +532,8 @@ cred = client.api.get_cos_cred(rtx="caller_rtx")
 
 # 查询剩余配额
 quota = client.api.get_user_quota(rtx="caller_rtx")
-print(quota.quota)  # 剩余次数
+print(quota.model_quota)  # 模型剩余次数
+print(quota.animation_quota)  # 动画剩余次数
 
 # 拉取模型列表
 models, total = client.api.get_model_list(

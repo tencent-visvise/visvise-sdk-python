@@ -33,7 +33,7 @@ print("="*70)
 
 try:
     q = client.api.get_user_quota(rtx=RTX)
-    print(f"\n剩余配额: {q.quota}\n")
+    print(f"\n模型配额: {q.model_quota}, 动画配额: {q.animation_quota}\n")
 except Exception as e:
     print(f"⚠️  查配额: {e}\n")
 

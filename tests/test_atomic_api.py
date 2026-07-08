@@ -34,8 +34,8 @@ def run(name, fn):
 # 1. get_user_quota
 def t_quota():
     q = client.api.get_user_quota(rtx=RTX)
-    assert isinstance(q.quota, int) and q.quota >= 0
-    ok("get_user_quota", f"quota={q.quota}  server_ts={q.server_ts}")
+    assert isinstance(q.model_quota, int) and q.model_quota >= 0
+    ok("get_user_quota", f"model_quota={q.model_quota} animation_quota={q.animation_quota} server_ts={q.server_ts}")
 run("get_user_quota", t_quota)
 
 # 2. list_algorithm_model — 覆盖 6 个节点类型
