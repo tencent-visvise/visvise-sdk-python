@@ -28,7 +28,7 @@ def main():
     print("[gen_preprocess] 开始原画风格化...")
     styled_id = client.gen_style_transfer(
         str(ASSETS / "preprocess.png"),
-        StyleType.GRAYSCALE,
+        style_type=StyleType.GRAYSCALE,
         name="example_gen_style_transfer",
         rtx=RTX,
     )

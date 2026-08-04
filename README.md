@@ -17,8 +17,8 @@ VISVISE Weaver OpenAPI 的 Python SDK，提供：
 - [客户端初始化](#客户端初始化)
 - [枚举常量](#枚举常量)
 - [高阶方法参考](#高阶方法参考)
-  - [gen_preprocess — 2D预处理](#gen_preprocess--2d预处理)
   - [gen_360 — 图生360](#gen_360--图生360)
+  - [gen_preprocess — 2D预处理](#gen_preprocess--2d预处理)
   - [gen_high_model — 图生高模](#gen_high_model--图生高模)
   - [gen_mid_model — 图生中模](#gen_mid_model--图生中模)
   - [gen_low_model — 图生低模](#gen_low_model--图生低模)
@@ -168,9 +168,10 @@ ImageGen360Style.Q_TOON      # "Q版卡通"
 ImageGen360Style.PIXEL       # "像素风格"
 
 # 2D 预处理
-NodeType.PREPROCESS_2D       # 16 - 2D 预处理
 PreprocessType.STYLIZED      # 1 - 原画风格化
 PreprocessType.PATTERNED     # 2 - 智能去花纹
+
+# 风格化
 StyleType.GRAYSCALE          # 1 - 灰模风
 StyleType.PIXEL              # 2 - 像素风
 StyleType.REALISTIC          # 3 - 写实风
@@ -197,36 +198,10 @@ from visvise import (
     VisviseClient, Environment,
     FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
     SegmentSplitType, SegmentGranularity,
-    PreprocessType, StyleParam, StyleType,
-    ReduceFace, View,
+    StyleType, ReduceFace, View,
 )
 
 client = VisviseClient(app_id="...", secret_key="...")
-```
-
-### gen_style_transfer / gen_patter_auto_remove — 2D预处理
-
-同步处理输入图片并保存为 `node_type=16` 资产，直接返回 `model_id`，无需调用 `wait_model()`。→ [示例代码](examples/gen_preprocess.py)
-
-```python
-from visvise import StyleType
-
-# 原画风格化
-styled_id = client.gen_style_transfer(
-    input_view="character.png",                    # 必填，输入图片：本地路径、VISVISE 平台 COS URL、bytes 或 BinaryIO
-    style_type=StyleType.GRAYSCALE,                 # 必填，风格类型：灰模/像素/写实/卡通手办风
-    algorithm_model="VISVISE-Pre2D-V1.0.0",         # 可选，算法模型；不传则自动选择首个可用模型
-    name="角色灰模原画",                              # 可选，资产名称，默认 "gen_style_transfer"
-    rtx="caller_rtx",                               # 必填，实际使用人的 RTX
-)
-
-# 智能去花纹
-patterned_id = client.gen_patter_auto_remove(
-    input_view="character.png",                    # 必填，输入图片：本地路径、VISVISE 平台 COS URL、bytes 或 BinaryIO
-    algorithm_model="VISVISE-Pre2D-V1.0.0",         # 可选，算法模型；不传则自动选择首个可用模型
-    name="角色去花纹原画",                             # 可选，资产名称，默认 "gen_patter_auto_remove"
-    rtx="caller_rtx",                               # 必填，实际使用人的 RTX
-)
 ```
 
 ### gen_360 — 图生360
@@ -248,6 +223,29 @@ model_id = client.gen_360(
 ```
 
 ---
+
+### gen_style_transfer / gen_patter_auto_remove — 2D预处理
+
+同步处理输入图片并保存为 `node_type=16` 资产，直接返回 `model_id`，无需调用 `wait_model()`。→ [示例代码](examples/gen_preprocess.py)
+
+```python
+# 原画风格化
+styled_id = client.gen_style_transfer(
+    input_view="character.png",                    # 必填，输入图片：本地路径、VISVISE 平台 COS URL、bytes 或 BinaryIO
+    style_type=StyleType.GRAYSCALE,                 # 可选，风格类型：灰模（默认）/像素/写实/卡通手办风
+    algorithm_model="VISVISE-Pre2D-V1.0.0",         # 可选，算法模型；不传则自动选择首个可用模型
+    name="角色灰模原画",                              # 可选，资产名称，默认 "gen_style_transfer"
+    rtx="caller_rtx",                               # 必填，实际使用人的 RTX
+)
+
+# 智能去花纹
+patterned_id = client.gen_patter_auto_remove(
+    input_view="character.png",                    # 必填，输入图片：本地路径、VISVISE 平台 COS URL、bytes 或 BinaryIO
+    algorithm_model="VISVISE-Pre2D-V1.0.0",         # 可选，算法模型；不传则自动选择首个可用模型
+    name="角色去花纹原画",                             # 可选，资产名称，默认 "gen_patter_auto_remove"
+    rtx="caller_rtx",                               # 必填，实际使用人的 RTX
+)
+```
 
 ### gen_high_model — 图生高模
 
@@ -594,20 +592,6 @@ client.api.batch_delete_model(["Model2026...", "Model2026..."], rtx="caller_rtx"
 
 # 去除背景
 out_url = client.api.remove_bg("https://cos.../image.png", rtx="caller_rtx")
-
-# 2D 预处理：风格化 / 智能去花纹
-styled_url = client.api.style_transfer("https://cos.../image.png", StyleType.GRAYSCALE, rtx="caller_rtx")
-auto_removed_url = client.api.patter_auto_remove("https://cos.../image.png", rtx="caller_rtx")
-
-# result_image 是带临时签名的 URL，须原样传入保存接口。
-# 将处理结果保存为 node_type=16 的资产
-model_id = client.api.gen_preprocess(
-    "styled_asset",
-    "https://cos.../image.png",
-    PreprocessType.STYLIZED,
-    style_param=StyleParam(StyleType.GRAYSCALE, styled_url),
-    rtx="caller_rtx",
-)
 
 # 文生动画提示词列表
 prompts = client.api.get_text2motion_prompt_list(language="zh", rtx="caller_rtx")

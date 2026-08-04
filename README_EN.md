@@ -17,8 +17,8 @@ Python SDK for the VISVISE Weaver OpenAPI. It provides:
 - [Client Initialization](#client-initialization)
 - [Enum Constants](#enum-constants)
 - [High-Level Methods](#high-level-methods)
-  - [gen_style_transfer / gen_patter_auto_remove — 2D Preprocessing](#gen_style_transfer--gen_patter_auto_remove--2d-preprocessing)
   - [gen_360 — Image to 360](#gen_360--image-to-360)
+  - [gen_style_transfer / gen_patter_auto_remove — 2D Preprocessing](#gen_style_transfer--gen_patter_auto_remove--2d-preprocessing)
   - [gen_high_model — Image to High-poly](#gen_high_model--image-to-high-poly)
   - [gen_mid_model — Image to Mid-poly](#gen_mid_model--image-to-mid-poly)
   - [gen_low_model — Image to Low-poly](#gen_low_model--image-to-low-poly)
@@ -168,9 +168,10 @@ ImageGen360Style.Q_TOON      # "Q版卡通"  - Q-style toon
 ImageGen360Style.PIXEL       # "像素风格" - pixel art
 
 # 2D preprocessing
-NodeType.PREPROCESS_2D       # 16 - 2D preprocessing
 PreprocessType.STYLIZED      # 1 - style transfer
 PreprocessType.PATTERNED     # 2 - automatic pattern removal
+
+# Stylized
 StyleType.GRAYSCALE          # 1 - grayscale
 StyleType.PIXEL              # 2 - pixel art
 StyleType.REALISTIC          # 3 - realistic
@@ -197,36 +198,10 @@ from visvise import (
     VisviseClient, Environment,
     FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
     SegmentSplitType, SegmentGranularity,
-    PreprocessType, StyleParam, StyleType,
-    ReduceFace, View,
+    StyleType, ReduceFace, View,
 )
 
 client = VisviseClient(app_id="...", secret_key="...")
-```
-
-### gen_style_transfer / gen_patter_auto_remove — 2D Preprocessing
-
-Synchronously processes an input image and saves it as a `node_type=16` asset. It returns the `model_id` directly; `wait_model()` is not required. → [Example](examples/gen_preprocess.py)
-
-```python
-from visvise import StyleType
-
-# Style transfer
-styled_id = client.gen_style_transfer(
-    input_view="character.png",                    # required, local path, VISVISE COS URL, bytes, or BinaryIO input image
-    style_type=StyleType.GRAYSCALE,                 # required, grayscale, pixel, realistic, or cartoon
-    algorithm_model="VISVISE-Pre2D-V1.0.0",         # optional, algorithm model; use None to select the first available model
-    name="styled_character",                         # optional, asset name; default "gen_style_transfer"
-    rtx="caller_rtx",                               # required, actual caller's RTX
-)
-
-# Automatic pattern removal
-patterned_id = client.gen_patter_auto_remove(
-    input_view="character.png",                    # required, local path, VISVISE COS URL, bytes, or BinaryIO input image
-    algorithm_model="VISVISE-Pre2D-V1.0.0",         # optional, algorithm model; use None to select the first available model
-    name="pattern_removed_character",                # optional, asset name; default "gen_patter_auto_remove"
-    rtx="caller_rtx",                               # required, actual caller's RTX
-)
 ```
 
 ### gen_360 — Image to 360
@@ -248,6 +223,29 @@ model_id = client.gen_360(
 ```
 
 ---
+
+### gen_style_transfer / gen_patter_auto_remove — 2D Preprocessing
+
+Synchronously processes an input image and saves it as a `node_type=16` asset. It returns the `model_id` directly; `wait_model()` is not required. → [Example](examples/gen_preprocess.py)
+
+```python
+# Style transfer
+styled_id = client.gen_style_transfer(
+    input_view="character.png",                    # required, local path, VISVISE COS URL, bytes, or BinaryIO input image
+    style_type=StyleType.GRAYSCALE,                 # optional, grayscale (default), pixel, realistic, or cartoon
+    algorithm_model="VISVISE-Pre2D-V1.0.0",         # optional, algorithm model; use None to select the first available model
+    name="styled_character",                         # optional, asset name; default "gen_style_transfer"
+    rtx="caller_rtx",                               # required, actual caller's RTX
+)
+
+# Automatic pattern removal
+patterned_id = client.gen_patter_auto_remove(
+    input_view="character.png",                    # required, local path, VISVISE COS URL, bytes, or BinaryIO input image
+    algorithm_model="VISVISE-Pre2D-V1.0.0",         # optional, algorithm model; use None to select the first available model
+    name="pattern_removed_character",                # optional, asset name; default "gen_patter_auto_remove"
+    rtx="caller_rtx",                               # required, actual caller's RTX
+)
+```
 
 ### gen_high_model — Image to High-poly
 
@@ -594,20 +592,6 @@ client.api.batch_delete_model(["Model2026...", "Model2026..."], rtx="caller_rtx"
 
 # Remove background
 out_url = client.api.remove_bg("https://cos.../image.png", rtx="caller_rtx")
-
-# 2D preprocessing: style transfer / automatic pattern removal
-styled_url = client.api.style_transfer("https://cos.../image.png", StyleType.GRAYSCALE, rtx="caller_rtx")
-auto_removed_url = client.api.patter_auto_remove("https://cos.../image.png", rtx="caller_rtx")
-
-# result_image is a signed URL and must be passed unchanged to the save API.
-# Save a processed image as a node_type=16 asset
-model_id = client.api.gen_preprocess(
-    "styled_asset",
-    "https://cos.../image.png",
-    PreprocessType.STYLIZED,
-    style_param=StyleParam(StyleType.GRAYSCALE, styled_url),
-    rtx="caller_rtx",
-)
 
 # Text-to-motion prompt suggestions
 prompts = client.api.get_text2motion_prompt_list(language="en", rtx="caller_rtx")

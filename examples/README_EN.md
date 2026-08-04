@@ -35,24 +35,6 @@ export VISVISE_ENV="prod"   # prod / test / dev
 | `animation_video.mp4` | Video-to-animation input video |
 | `pose_ref.png` | Pose reference image |
 
-## 2D Preprocess Example
-
-`gen_preprocess.py` synchronously runs style transfer (via ``client.gen_style_transfer()``) or automatic pattern removal (via ``client.gen_patter_auto_remove()``) and saves an asset. It can take up to 120 seconds; the example uses a 180-second client timeout.
-
-| Environment variable | Required | Description |
-|---|---|---|
-| `VISVISE_PREPROCESS_INPUT` | Yes | Local image path or VISVISE platform COS URL |
-| `VISVISE_PREPROCESS_MODE` | No | `stylized` (default) or `auto-remove` |
-| `VISVISE_PREPROCESS_STYLE` | `stylized` only | `grayscale` (default), `pixel`, `realistic`, or `cartoon` |
-| `VISVISE_PREPROCESS_NAME` | No | Asset name; defaults to `example_gen_preprocess` |
-| `VISVISE_PREPROCESS_ALGORITHM_MODEL` | No | Explicit 2D preprocess model; auto-selects the first available model when omitted |
-| `VISVISE_ENV` | No | `prod` (default), `test`, or `dev` |
-
-```bash
-cd examples
-python gen_preprocess.py
-```
-
 ## Running Examples
 
 ```bash

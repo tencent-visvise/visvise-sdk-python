@@ -646,8 +646,8 @@ class VisviseClient:
     def gen_style_transfer(
         self,
         input_view: FileInput,
-        style_type: int,
         *,
+        style_type: int = StyleType.GRAYSCALE,
         rtx: str,
         algorithm_model: Optional[str] = None,
         name: str = "gen_style_transfer",
@@ -656,7 +656,7 @@ class VisviseClient:
 
         Args:
             input_view: 本地路径、VISVISE 平台 COS URL、bytes 或 BinaryIO；本地和二进制输入会自动上传。
-            style_type: 风格类型，使用 :class:`~visvise.models.StyleType` 常量。
+            style_type: 风格类型，使用 :class:`~visvise.models.StyleType` 常量，默认灰模风。
             rtx: 实际使用人的 RTX。**必填**。
             algorithm_model: 可选算法模型名称；未传时自动选择当前账号可用的首个 2D 预处理模型。
             name: 保存的资产名称。

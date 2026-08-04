@@ -37,24 +37,6 @@ export VISVISE_ENV="prod"   # prod / test / dev
 | `animation_video.mp4` | 视频生动画输入视频 |
 | `pose_ref.png` | 图生Pose 参考图片 |
 
-## 2D 预处理示例
-
-`gen_preprocess.py` 分别通过 ``client.gen_style_transfer()`` 和 ``client.gen_patter_auto_remove()`` 同步执行风格化或智能去花纹并保存资产；最长可能需要 120 秒，示例使用 180 秒客户端超时。
-
-| 环境变量 | 必填 | 说明 |
-|---|---|---|
-| `VISVISE_PREPROCESS_INPUT` | 是 | 本地图片路径或 VISVISE 平台 COS URL |
-| `VISVISE_PREPROCESS_MODE` | 否 | `stylized`（默认）或 `auto-remove` |
-| `VISVISE_PREPROCESS_STYLE` | 仅 `stylized` | `grayscale`（默认）、`pixel`、`realistic` 或 `cartoon` |
-| `VISVISE_PREPROCESS_NAME` | 否 | 保存资产名称，默认 `example_gen_preprocess` |
-| `VISVISE_PREPROCESS_ALGORITHM_MODEL` | 否 | 指定 2D 预处理模型；不传时自动选择首个可用模型 |
-| `VISVISE_ENV` | 否 | `prod`（默认）、`test` 或 `dev` |
-
-```bash
-cd examples
-python gen_preprocess.py
-```
-
 ## 运行示例
 
 ```bash
