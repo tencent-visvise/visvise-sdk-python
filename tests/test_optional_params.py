@@ -155,7 +155,7 @@ print("\n=== gen_lod ===")
 def t_lod_a():
     mids = client.gen_lod(
         str(ASSETS/"tex_model.obj"), "VISVISE-LOD-V1.0.0",
-        reduce_faces=[ReduceFace(1, 50, 2)],
+        reduce_faces=[ReduceFace(1, 50, 2, project_type="lod_usr_full")],
         output_model_format="fbx", gen_times=1, name="opt_lod_a",
         rtx=RTX,)
     check("gen_lod gen_times=1 fbx", mids[0],

@@ -9,6 +9,7 @@ VISVISE Weaver SDK - 主客户端
 
 from __future__ import annotations
 
+
 import io
 import logging
 import os
@@ -23,6 +24,10 @@ from .http import Environment, WeaverHTTPClient
 from .models import (
     GetCosCredResult,
     ImageGen360Style,
+    PreprocessType,
+    RemovePatternParam,
+    StyleParam,
+    StyleType,
     ModelInfo,
     ModelStatus,
     NodeType,
@@ -636,7 +641,96 @@ class VisviseClient:
     # 每个方法对应一种节点类型，封装「上传文件 + 创建任务」，返回 model_id
     # ══════════════════════════════════════════════════════════════════════
 
-    # ── 3.1 图生360 ─────────────────────────────────────────────────────
+    # ── 3.1 2D 预处理 ──────────────────────────────────────────────────
+
+    def gen_style_transfer(
+        self,
+        input_view: FileInput,
+        style_type: int,
+        *,
+        rtx: str,
+        algorithm_model: Optional[str] = None,
+        name: str = "gen_style_transfer",
+    ) -> str:
+        """对原画进行风格化处理并同步保存为 2D 预处理资产。
+
+        Args:
+            input_view: 本地路径、VISVISE 平台 COS URL、bytes 或 BinaryIO；本地和二进制输入会自动上传。
+            style_type: 风格类型，使用 :class:`~visvise.models.StyleType` 常量。
+            rtx: 实际使用人的 RTX。**必填**。
+            algorithm_model: 可选算法模型名称；未传时自动选择当前账号可用的首个 2D 预处理模型。
+            name: 保存的资产名称。
+
+        Returns:
+            同步创建的 2D 预处理资产 ID。
+
+        Raises:
+            WeaverError / 子类: 上传、算法调用或保存资产失败。
+            ValueError: 风格类型无效。
+
+        ``result_image`` 是风格化处理返回的临时签名 URL，SDK 会原样传入保存接口，不会移除或修改 query 参数。
+        同步处理最长可能需要 120 秒，请将客户端 ``timeout`` 设为至少 120 秒。
+        """
+        input_url = self._resolve_file(input_view, rtx=rtx)
+        resolved_model = self._resolve_algorithm_model(
+            algorithm_model, NodeType.PREPROCESS_2D, rtx=rtx
+        )
+
+        result_image = self.api.style_transfer(input_url, style_type, rtx=rtx)
+        if not result_image:
+            raise ValueError("style_transfer returned an empty result_image.")
+        return self.api.gen_preprocess(
+            name,
+            input_url,
+            PreprocessType.STYLIZED,
+            algorithm_model=resolved_model,
+            style_param=StyleParam(style_type, result_image),
+            rtx=rtx,
+        )
+
+    def gen_patter_auto_remove(
+        self,
+        input_view: FileInput,
+        *,
+        rtx: str,
+        algorithm_model: Optional[str] = None,
+        name: str = "gen_patter_auto_remove",
+    ) -> str:
+        """自动去除原画表面花纹并同步保存为 2D 预处理资产。
+
+        Args:
+            input_view: 本地路径、VISVISE 平台 COS URL、bytes 或 BinaryIO；本地和二进制输入会自动上传。
+            rtx: 实际使用人的 RTX。**必填**。
+            algorithm_model: 可选算法模型名称；未传时自动选择当前账号可用的首个 2D 预处理模型。
+            name: 保存的资产名称。
+
+        Returns:
+            同步创建的 2D 预处理资产 ID。
+
+        Raises:
+            WeaverError / 子类: 上传、算法调用或保存资产失败。
+
+        ``result_image`` 是去花纹处理返回的临时签名 URL，SDK 会原样传入保存接口，不会移除或修改 query 参数。
+        同步处理最长可能需要 120 秒，请将客户端 ``timeout`` 设为至少 120 秒。
+        """
+        input_url = self._resolve_file(input_view, rtx=rtx)
+        resolved_model = self._resolve_algorithm_model(
+            algorithm_model, NodeType.PREPROCESS_2D, rtx=rtx
+        )
+
+        result_image = self.api.patter_auto_remove(input_url, rtx=rtx)
+        if not result_image:
+            raise ValueError("patter_auto_remove returned an empty result_image.")
+        return self.api.gen_preprocess(
+            name,
+            input_url,
+            PreprocessType.PATTERNED,
+            algorithm_model=resolved_model,
+            remove_pattern_param=RemovePatternParam(result_image),
+            rtx=rtx,
+        )
+
+    # ── 3.2 图生360 ─────────────────────────────────────────────────────
 
     def gen_360(
         self,

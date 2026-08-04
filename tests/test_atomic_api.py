@@ -44,6 +44,7 @@ def t_list_alg():
         (7, None, "图生360"), (3, None, "图生高模"),
         (4, 1, "视频生动画"), (4, 2, "文生动画"),
         (5, None, "骨骼架设"), (2, None, "LOD"),
+        (16, None, "2D预处理"),
     ]:
         models = client.api.list_algorithm_model(node_type, sub_type, rtx=RTX)
         assert isinstance(models, list) and len(models) > 0, f"{label} 返回空列表"

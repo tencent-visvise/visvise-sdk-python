@@ -18,6 +18,8 @@ from .models import (
     ModelInfo,
     UserQuota,
     View,
+    RemovePatternParam,
+    StyleParam,
 )
 
 logger = logging.getLogger("visvise.api")
@@ -327,6 +329,100 @@ class VisviseAPI:
             rtx=rtx,
         )
         return data["image_url"]
+
+    # ──────────────────────────────────────────────────────────────────────
+    # 2D 预处理
+    # ──────────────────────────────────────────────────────────────────────
+
+    def style_transfer(self, input_view: str, style_type: int, *, rtx: str) -> str:
+        """对原画进行风格化处理，返回处理结果图片 COS URL。
+
+        Args:
+            input_view: 输入原画的 VISVISE 平台 COS URL。
+            style_type: 风格类型，使用 :class:`~visvise.models.StyleType` 常量。
+            rtx: 实际使用人的 RTX。**必填**。
+
+        Returns:
+            处理结果图片的临时签名 COS 下载 URL（24h 有效）；用于保存资产时必须原样保留 query 参数。
+
+        Raises:
+            WeaverError / 子类: 接口错误。
+        """
+        data = self._http.post(
+            "openapi/weaver/resource/style_transfer",
+            {"input_view": input_view, "style_type": style_type},
+            rtx=rtx,
+        )
+        return data["result_image"]
+
+    def patter_auto_remove(self, input_view: str, *, rtx: str) -> str:
+        """自动去除原画表面花纹，返回处理结果图片 COS URL。
+
+        Args:
+            input_view: 输入原画的 VISVISE 平台 COS URL。
+            rtx: 实际使用人的 RTX。**必填**。
+
+        Returns:
+            处理结果图片的临时签名 COS 下载 URL（24h 有效）；用于保存资产时必须原样保留 query 参数。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        data = self._http.post(
+            "openapi/weaver/resource/patter_auto_remove",
+            {"input_view": input_view},
+            rtx=rtx,
+        )
+        return data["result_image"]
+
+    def gen_preprocess(
+        self,
+        name: str,
+        input_view: str,
+        preprocess_type: int,
+        *,
+        rtx: str,
+        algorithm_model: Optional[str] = None,
+        style_param: Optional[StyleParam] = None,
+        remove_pattern_param: Optional[RemovePatternParam] = None,
+    ) -> str:
+        """将已处理图片保存为 2D 预处理模型资产。
+
+        ``preprocess_type=PreprocessType.STYLIZED`` 时需传入 ``style_param``；
+        ``preprocess_type=PreprocessType.PATTERNED`` 时需传入
+        ``remove_pattern_param``。
+
+        Args:
+            name: 模型资产名称。
+            input_view: 原始输入图片的 VISVISE 平台 COS URL。
+            preprocess_type: 预处理类型，使用 :class:`~visvise.models.PreprocessType` 常量。
+            rtx: 实际使用人的 RTX。**必填**。
+            algorithm_model: 可选算法模型名称。
+            style_param: 风格化结果参数；其 ``result_image`` 必须是 ``style_transfer``
+                返回的完整临时签名 URL，不能移除或修改 query 参数。
+            remove_pattern_param: 去花纹结果参数；其 ``result_image`` 必须是
+                ``patter_auto_remove`` 返回的完整临时签名 URL，不能移除或修改 query 参数。
+
+        Returns:
+            已创建的 2D 预处理模型资产 ID。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {
+            "name": name,
+            "input_view": input_view,
+            "preprocess_type": preprocess_type,
+        }
+        if algorithm_model is not None:
+            body["algorithm_model"] = algorithm_model
+        if style_param is not None:
+            body["style_param"] = style_param.to_dict()
+        if remove_pattern_param is not None:
+            body["remove_pattern_param"] = remove_pattern_param.to_dict()
+
+        data = self._http.post("openapi/weaver/resource/gen_preprocess", body, rtx=rtx)
+        return data["model_id"]
 
     # ──────────────────────────────────────────────────────────────────────
     # 2.12 批量图生 Pose
