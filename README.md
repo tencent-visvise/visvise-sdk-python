@@ -359,8 +359,8 @@ model_id = client.gen_retopology(
 model_ids = client.gen_lod(
     model_path="path/to/model.fbx",               # 必填，输入模型
     reduce_faces=[                                 # 必填，减面配置列表
-        ReduceFace(reduce_level=1, reduce_percent=50, face_type=FaceType.QUAD, project_type="lod_usr_full"),
-        ReduceFace(reduce_level=2, reduce_percent=25, face_type=FaceType.QUAD, project_type="lod_usr_fast_full"),
+        ReduceFace(reduce_level=1, reduce_percent=50, face_type=FaceType.QUAD),
+        ReduceFace(reduce_level=2, reduce_percent=25, face_type=FaceType.QUAD),
     ],
     algorithm_model=None,                          # 可选，如 "VISVISE-LOD-V1.0.0"
     output_model_format=OutputModelFormat.FBX,    # 可选，输出格式
@@ -718,8 +718,8 @@ client = VisviseClient(app_id="...", secret_key="...")
 model_ids = client.gen_lod(
     model_path="high_model.fbx",
     reduce_faces=[
-        ReduceFace(reduce_level=1, reduce_percent=50, face_type=FaceType.QUAD, project_type="lod_usr_full"),
-        ReduceFace(reduce_level=2, reduce_percent=25, face_type=FaceType.QUAD, project_type="lod_usr_fast_full"),
+        ReduceFace(reduce_level=1, reduce_percent=50, face_type=FaceType.QUAD),
+        ReduceFace(reduce_level=2, reduce_percent=25, face_type=FaceType.QUAD),
     ],
     output_model_format=OutputModelFormat.FBX,
     gen_times=3,

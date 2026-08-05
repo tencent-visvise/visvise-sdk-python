@@ -359,8 +359,8 @@ Generate level-of-detail meshes (node_type=2), with multi-shot support. → [Exa
 model_ids = client.gen_lod(
     model_path="path/to/model.fbx",               # required, input model
     reduce_faces=[                                 # required, reduction config list
-        ReduceFace(reduce_level=1, reduce_percent=50, face_type=FaceType.QUAD, project_type="lod_usr_full"),
-        ReduceFace(reduce_level=2, reduce_percent=25, face_type=FaceType.QUAD, project_type="lod_usr_fast_full"),
+        ReduceFace(reduce_level=1, reduce_percent=50, face_type=FaceType.QUAD),
+        ReduceFace(reduce_level=2, reduce_percent=25, face_type=FaceType.QUAD),
     ],
     algorithm_model=None,                          # optional, e.g. "VISVISE-LOD-V1.0.0"
     output_model_format=OutputModelFormat.FBX,    # optional, output format
@@ -714,12 +714,11 @@ print("Animation download URL:", anim.output_model)
 from visvise import VisviseClient, ReduceFace, FaceType, OutputModelFormat
 
 client = VisviseClient(app_id="...", secret_key="...")
-
 model_ids = client.gen_lod(
     model_path="high_model.fbx",
     reduce_faces=[
-        ReduceFace(reduce_level=1, reduce_percent=50, face_type=FaceType.QUAD, project_type="lod_usr_full"),
-        ReduceFace(reduce_level=2, reduce_percent=25, face_type=FaceType.QUAD, project_type="lod_usr_fast_full"),
+        ReduceFace(reduce_level=1, reduce_percent=50, face_type=FaceType.QUAD),
+        ReduceFace(reduce_level=2, reduce_percent=25, face_type=FaceType.QUAD),
     ],
     output_model_format=OutputModelFormat.FBX,
     gen_times=3,

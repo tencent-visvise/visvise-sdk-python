@@ -31,9 +31,9 @@ def main():
         model_path=str(ASSETS / "tex_model.obj"),
         algorithm_model="VISVISE-LOD-V1.0.0",
         reduce_faces=[
-            ReduceFace(reduce_level=1, reduce_percent=50, face_type=FaceType.QUAD, project_type="lod_usr_full"),
-            ReduceFace(reduce_level=2, reduce_percent=25, face_type=FaceType.QUAD, project_type="lod_usr_fast_full"),
-            ReduceFace(reduce_level=3, reduce_percent=13, face_type=FaceType.QUAD, project_type="lod_usr_fast_full"),
+            ReduceFace(reduce_level=1, reduce_percent=50, face_type=FaceType.QUAD),
+            ReduceFace(reduce_level=2, reduce_percent=25, face_type=FaceType.QUAD),
+            ReduceFace(reduce_level=3, reduce_percent=13, face_type=FaceType.QUAD),
         ],
         output_model_format=OutputModelFormat.FBX,
         gen_times=1,

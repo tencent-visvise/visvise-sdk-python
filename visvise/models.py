@@ -162,14 +162,12 @@ class ReduceFace:
     reduce_level: int
     reduce_percent: int
     face_type: int  # 1:三角面 2:四边面
-    project_type: str = ""  # lod_usr_full / lod_usr_fast_full
 
     def to_dict(self) -> dict:
         return {
             "reduce_level": self.reduce_level,
             "reduce_percent": self.reduce_percent,
             "face_type": self.face_type,
-            "project_type": self.project_type,
         }
 
 
