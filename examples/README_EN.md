@@ -7,7 +7,7 @@ Each file corresponds to a complete usage example for a `gen_xxx` method, and ca
 ## Prerequisites
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.2
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git
 ```
 
 Set environment variables:
@@ -15,7 +15,7 @@ Set environment variables:
 ```bash
 export VISVISE_APP_ID="your_app_id"
 export VISVISE_SECRET_KEY="your_secret_key"
-export VISVISE_UID="your_uid"
+export VISVISE_RTX="your_rtx"
 # Optional, defaults to production
 export VISVISE_ENV="prod"   # prod / test / dev
 ```

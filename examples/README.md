@@ -7,7 +7,7 @@
 ## 前置条件
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.2
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git
 ```
 
 设置环境变量：
@@ -15,7 +15,7 @@ pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.0.2
 ```bash
 export VISVISE_APP_ID="your_app_id"
 export VISVISE_SECRET_KEY="your_secret_key"
-export VISVISE_UID="your_uid"
+export VISVISE_RTX="your_rtx"
 # 可选，默认线上生产环境
 export VISVISE_ENV="prod"   # prod / test / dev
 ```

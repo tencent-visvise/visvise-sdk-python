@@ -30,6 +30,21 @@ class NodeType:
     IMG_TO_POSE = 12      # 图生 Pose
     IMG_TO_3D_LOW = 13    # 图生3D（低模）
     SEGMENT_2D = 14       # 2D 拆分
+    PREPROCESS_2D = 16    # 2D 预处理
+
+
+class PreprocessType:
+    """2D 预处理类型枚举 (preprocess_type)。"""
+    STYLIZED = 1          # 风格化
+    PATTERNED = 2         # 去花纹
+
+
+class StyleType:
+    """原画风格化类型枚举 (style_type)。"""
+    GRAYSCALE = 1         # 灰模风
+    PIXEL = 2             # 像素风
+    REALISTIC = 3         # 写实风
+    CARTOON = 4           # 卡通手办风
 
 
 class ModelStatus:
@@ -117,6 +132,28 @@ class View:
         if self.right_view:
             d["right_view"] = self.right_view
         return d
+
+
+@dataclass
+class StyleParam:
+    """风格化结果参数，用于保存 2D 预处理资产。"""
+    style_type: int
+    result_image: str
+
+    def to_dict(self) -> dict:
+        return {
+            "style_type": self.style_type,
+            "result_image": self.result_image,
+        }
+
+
+@dataclass
+class RemovePatternParam:
+    """去花纹结果参数，用于保存 2D 预处理资产。"""
+    result_image: str
+
+    def to_dict(self) -> dict:
+        return {"result_image": self.result_image}
 
 
 @dataclass

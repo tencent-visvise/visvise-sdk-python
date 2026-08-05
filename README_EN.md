@@ -18,6 +18,7 @@ Python SDK for the VISVISE Weaver OpenAPI. It provides:
 - [Enum Constants](#enum-constants)
 - [High-Level Methods](#high-level-methods)
   - [gen_360 — Image to 360](#gen_360--image-to-360)
+  - [gen_style_transfer / gen_patter_auto_remove — 2D Preprocessing](#gen_style_transfer--gen_patter_auto_remove--2d-preprocessing)
   - [gen_high_model — Image to High-poly](#gen_high_model--image-to-high-poly)
   - [gen_mid_model — Image to Mid-poly](#gen_mid_model--image-to-mid-poly)
   - [gen_low_model — Image to Low-poly](#gen_low_model--image-to-low-poly)
@@ -130,6 +131,7 @@ The SDK exposes the following enum constants. Prefer them over hard-coded number
 from visvise import (
     FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
     SegmentSplitType, SegmentGranularity, ImageGen360Style,
+    NodeType, PreprocessType, StyleParam, StyleType,
 )
 
 # Face type
@@ -164,13 +166,23 @@ ImageGen360Style.GRAY_MODEL  # "灰模"      - gray model
 ImageGen360Style.PHOTOREAL   # "超写实"    - photoreal
 ImageGen360Style.Q_TOON      # "Q版卡通"  - Q-style toon
 ImageGen360Style.PIXEL       # "像素风格" - pixel art
+
+# 2D preprocessing
+PreprocessType.STYLIZED      # 1 - style transfer
+PreprocessType.PATTERNED     # 2 - automatic pattern removal
+
+# Stylized
+StyleType.GRAYSCALE          # 1 - grayscale
+StyleType.PIXEL              # 2 - pixel art
+StyleType.REALISTIC          # 3 - realistic
+StyleType.CARTOON            # 4 - cartoon figurine
 ```
 
 ---
 
 ## High-Level Methods
 
-High-level methods bundle "COS upload + async task creation" into a single call. Pass either a local file path or a VISVISE COS URL; each method returns a `model_id`.
+High-level methods bundle "COS upload + task creation" into a single call. Pass either a local file path or a VISVISE COS URL; each method returns a `model_id`. `gen_style_transfer` / `gen_patter_auto_remove` are synchronous; other `gen_xxx()` methods usually create asynchronous tasks.
 
 > **About `algorithm_model`:** Every `gen_xxx` method's `algorithm_model` is optional. When omitted, the SDK calls `list_algorithm_model` and uses the first available model for the current account.
 
@@ -186,7 +198,7 @@ from visvise import (
     VisviseClient, Environment,
     FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
     SegmentSplitType, SegmentGranularity,
-    ReduceFace, View,
+    StyleType, ReduceFace, View,
 )
 
 client = VisviseClient(app_id="...", secret_key="...")
@@ -211,6 +223,29 @@ model_id = client.gen_360(
 ```
 
 ---
+
+### gen_style_transfer / gen_patter_auto_remove — 2D Preprocessing
+
+Synchronously processes an input image and saves it as a `node_type=16` asset. It returns the `model_id` directly; `wait_model()` is not required. → [Example](examples/gen_preprocess.py)
+
+```python
+# Style transfer
+styled_id = client.gen_style_transfer(
+    input_view="character.png",                    # required, local path, VISVISE COS URL, bytes, or BinaryIO input image
+    style_type=StyleType.GRAYSCALE,                 # optional, grayscale (default), pixel, realistic, or cartoon
+    algorithm_model="VISVISE-Pre2D-V1.0.0",         # optional, algorithm model; use None to select the first available model
+    name="styled_character",                         # optional, asset name; default "gen_style_transfer"
+    rtx="caller_rtx",                               # required, actual caller's RTX
+)
+
+# Automatic pattern removal
+patterned_id = client.gen_patter_auto_remove(
+    input_view="character.png",                    # required, local path, VISVISE COS URL, bytes, or BinaryIO input image
+    algorithm_model="VISVISE-Pre2D-V1.0.0",         # optional, algorithm model; use None to select the first available model
+    name="pattern_removed_character",                # optional, asset name; default "gen_patter_auto_remove"
+    rtx="caller_rtx",                               # required, actual caller's RTX
+)
+```
 
 ### gen_high_model — Image to High-poly
 
@@ -317,6 +352,8 @@ model_id = client.gen_retopology(
 ### gen_lod — LOD
 
 Generate level-of-detail meshes (node_type=2), with multi-shot support. → [Example](examples/gen_lod.py)
+
+
 
 ```python
 model_ids = client.gen_lod(
@@ -677,7 +714,6 @@ print("Animation download URL:", anim.output_model)
 from visvise import VisviseClient, ReduceFace, FaceType, OutputModelFormat
 
 client = VisviseClient(app_id="...", secret_key="...")
-
 model_ids = client.gen_lod(
     model_path="high_model.fbx",
     reduce_faces=[
