@@ -876,6 +876,9 @@ class VisviseClient:
         rtx: str,
         segment_model_id: Optional[str] = None,
         model_id_360: Optional[str] = None,
+        group_ids: Optional[FileInput] = None,
+        part_mesh_path: Optional[FileInput] = None,
+        label_to_id: Optional[FileInput] = None,
     ) -> str:
         """图生中模（node_type=11）。
 
@@ -894,11 +897,14 @@ class VisviseClient:
             name: 任务名称。
             segment_model_id: 2D 分割资产 ID，传入后将基于分割结果生成模型。
             model_id_360: 360 模型资产 ID，传入后将基于 360 模型生成中模。
+            group_ids: 自定义部件分组 NPZ 文件，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+            part_mesh_path: 包含所有部件的 OBJ 文件，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+            label_to_id: 部件名称到 ID 映射 JSON 文件，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
 
         Returns:
             新生成的模型 ID。
         """
-        view = View()
+        view = View(main_view="")
         if model_id_360 is None and segment_model_id is None:
             # Resolve main view (required)
             view.main_view = self._resolve_file(main_view, rtx=rtx)
@@ -921,6 +927,24 @@ class VisviseClient:
             img_params["segment_model_id"] = segment_model_id
         if model_id_360 is not None:
             img_params["model_id_360"] = model_id_360
+        if group_ids is not None:
+            img_params["group_ids"] = self._resolve_file(
+                group_ids,
+                rtx=rtx,
+                filename=_gen_random_filename(".npz"),
+            )
+        if part_mesh_path is not None:
+            img_params["part_mesh_path"] = self._resolve_file(
+                part_mesh_path,
+                rtx=rtx,
+                filename=_gen_random_filename(".obj"),
+            )
+        if label_to_id is not None:
+            img_params["label_to_id"] = self._resolve_file(
+                label_to_id,
+                rtx=rtx,
+                filename=_gen_random_filename(".json"),
+            )
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.IMG_TO_3D_MID,
