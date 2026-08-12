@@ -283,7 +283,10 @@ model_id = client.gen_mid_model(
     face_type=FaceType.TRIANGLE,                  # 可选，面数类型
     name="gen_mid_model",                         # 可选，任务名称
     segment_model_id=None,                        # 可选，2D 分割资产 ID（仅中模有效），用于基于2D分割结果生成
-    model_id_360=None,                                # 可选，图生360资产 ID，用于基于图生360结果生成
+    model_id_360=None,                             # 可选，图生360资产 ID，用于基于图生360结果生成
+    group_ids=None,                                # 可选，自定义部件分组 NPZ 文件，group_ids、part_mesh_path 和 label_to_id 要同时使用
+    part_mesh_path=None,                           # 可选，包含所有部件的 OBJ 文件
+    label_to_id=None,                              # 可选，部件名称到 ID 映射的 JSON 文件
     rtx="caller_rtx",
 )
 ```

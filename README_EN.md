@@ -284,6 +284,9 @@ model_id = client.gen_mid_model(
     name="gen_mid_model",                         # optional, task name
     segment_model_id=None,                        # optional, 2D segmentation asset ID (mid-poly only), generate from 2D segmentation result
     model_id_360=None,                            # optional, gen_360 asset ID, generate from gen_360 result
+    group_ids=None,                               # optional, custom part-group NPZ file, group_ids, part_mesh_path, and label_to_id must be provided together
+    part_mesh_path=None,                          # optional, OBJ file containing all parts
+    label_to_id=None,                             # optional, JSON file containing the part-name-to-ID mapping
     rtx="caller_rtx",
 )
 ```
