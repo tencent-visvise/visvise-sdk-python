@@ -239,6 +239,7 @@ class VisviseClient:
         rtx: str,
         filename: Optional[str] = None,
         is_temp: bool = False,
+        randomize_name: bool = False,
     ) -> str:
         """将文件输入统一解析并上传到 COS，返回 VISVISE 平台 COS URL。
 
@@ -257,6 +258,9 @@ class VisviseClient:
             rtx: 实际使用人的 RTX，用于调用 get_cos_cred 接口。
             filename: 内部使用的文件名（含扩展名）。bytes/BinaryIO 输入时若不传则自动用 uuid 生成。
             is_temp: 是否临时文件（7天后自动删除）。
+            randomize_name: 本地路径上传时是否重命名为「原文件名 + uuid + 扩展名」，
+                用于避免同名文件互相覆盖。默认 False（沿用原始文件名）。
+                bytes/BinaryIO 输入本就使用 uuid 命名，此参数不生效。
 
         Returns:
             上传后的 VISVISE 平台 COS URL，或原始 URL 字符串（如果 source 本身已是 URL）。
@@ -295,7 +299,12 @@ class VisviseClient:
         path_prefix = cred.path_prefix.rstrip("/") + "/"
         if isinstance(source, str):
             # 本地路径
-            _filename = filename or os.path.basename(source)
+            if randomize_name and not filename:
+                stem, ext = os.path.splitext(os.path.basename(source))
+                ext = ext or ".bin"
+                _filename = f"{stem}_{uuid.uuid4().hex}{ext}"
+            else:
+                _filename = filename or os.path.basename(source)
             cos_key = f"{path_prefix}{_filename}"
             logger.info("上传文件 %s → cos://%s/%s", source, cred.bucket, cos_key)
             with open(source, "rb") as f:
@@ -874,6 +883,8 @@ class VisviseClient:
         name: str = "gen_mid_model",
         *,
         rtx: str,
+        face_num: Optional[int] = None,
+        skip_360_preprocess: Optional[bool] = None,
         segment_model_id: Optional[str] = None,
         model_id_360: Optional[str] = None,
         group_ids: Optional[FileInput] = None,
@@ -887,14 +898,17 @@ class VisviseClient:
 
         Args:
             main_view: 主视图，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
-                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
+                上传时文件名自动重命名为「原文件名 + uuid + 扩展名」。
             back_view / left_view / right_view: 可选额外视图，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
-                bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
+                上传时文件名自动重命名为「原文件名 + uuid + 扩展名」。
             algorithm_model: 算法模型（可通过 list_algorithm_model(node_type=11) 获取）。
                 可选，若不传则自动获取当前账号可用的第一个模型。
             output_model_format: 输出格式，默认 fbx。
             face_type: 面数类型，默认 1。
             name: 任务名称。
+            face_num: 目标面数，范围 (0, 50000]，不传自动配置。
+            skip_360_preprocess: 是否跳过图生360前置处理，默认 False（不跳过）。
+                注意：与自定义 Mask 参数（group_ids 等）互斥，同时使用会被服务端拒绝。
             segment_model_id: 2D 分割资产 ID，传入后将基于分割结果生成模型。
             model_id_360: 360 模型资产 ID，传入后将基于 360 模型生成中模。
             group_ids: 自定义部件分组 NPZ 文件，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
@@ -907,22 +921,26 @@ class VisviseClient:
         view = View(main_view="")
         if model_id_360 is None and segment_model_id is None:
             # Resolve main view (required)
-            view.main_view = self._resolve_file(main_view, rtx=rtx)
+            view.main_view = self._resolve_file(main_view, rtx=rtx, randomize_name=True)
             # Resolve back view
             if back_view is not None:
-                view.back_view = self._resolve_file(back_view, rtx=rtx)
+                view.back_view = self._resolve_file(back_view, rtx=rtx, randomize_name=True)
             # Resolve left view
             if left_view is not None:
-                view.left_view = self._resolve_file(left_view, rtx=rtx)
+                view.left_view = self._resolve_file(left_view, rtx=rtx, randomize_name=True)
             # Resolve right view
             if right_view is not None:
-                view.right_view = self._resolve_file(right_view, rtx=rtx)
+                view.right_view = self._resolve_file(right_view, rtx=rtx, randomize_name=True)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_MID, rtx=rtx)
         img_params: dict = {
             "algorithm_model": resolved_model,
             "output_model_format": output_model_format,
             "face_type": face_type,
         }
+        if face_num is not None:
+            img_params["face_num"] = face_num
+        if skip_360_preprocess is not None:
+            img_params["skip_360_preprocess"] = skip_360_preprocess
         if segment_model_id is not None:
             img_params["segment_model_id"] = segment_model_id
         if model_id_360 is not None:
