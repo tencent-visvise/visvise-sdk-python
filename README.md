@@ -282,9 +282,10 @@ model_id = client.gen_mid_model(
     output_model_format=OutputModelFormat.FBX,    # 可选，输出格式（默认 fbx）
     face_type=FaceType.TRIANGLE,                  # 可选，面数类型
     name="gen_mid_model",                         # 可选，任务名称
+    face_num=None,                                # 可选，目标面数（0~30000，0=使用默认值），不传自动配置
     segment_model_id=None,                        # 可选，2D 分割资产 ID（仅中模有效），用于基于2D分割结果生成
     model_id_360=None,                             # 可选，图生360资产 ID，用于基于图生360结果生成
-    group_ids=None,                                # 可选，自定义部件分组 NPZ 文件，group_ids、part_mesh_path 和 label_to_id 要同时使用
+    group_ids=None,                                # 可选，自定义部件分组 NPZ 文件
     part_mesh_path=None,                           # 可选，包含所有部件的 OBJ 文件
     label_to_id=None,                              # 可选，部件名称到 ID 映射的 JSON 文件
     rtx="caller_rtx",
@@ -324,6 +325,7 @@ model_id = client.gen_mesh_refine(
     input_model_format=OutputModelFormat.FBX,                     # 可选，输入模型格式（默认 fbx）
     name="gen_mesh_refine",                        # 可选，任务名称
     mode=None,                                     # 可选，MeshRefineMode.OPTIMIZE(1, 默认) / DENSIFY(2)
+    face_num=None,                                 # 可选，目标面数（仅布线优化 mode=1 生效，0~50000，0=不设置）
     color_model=None,                              # 可选，带颜色的模型，用于为输出附加颜色,
     rtx="caller_rtx",
 )
@@ -476,18 +478,39 @@ model_id = client.gen_video_motion(
 
 ### gen_text_motion — 文本生动画
 
-通过提示词生成动画，一次返回 4 个模型供抽卡（node_type=4）。 → [示例代码](examples/gen_text_motion.py)
+通过提示词生成动画（node_type=4），返回 1 个 model_id（单个 model 内部含 4 个抽卡候选）。
+支持单段提示词 `prompt` 与多段提示词 `segments` 两种模式（`segments` 非空时以多段为准）。 → [示例代码](examples/gen_text_motion.py)
 
 ```python
+from visvise import MotionSegment
+
+# 方式一：多段提示词 segments（1~15 段）
 model_ids = client.gen_text_motion(
     model_path="path/to/model.zip",               # 必填，模型 zip 包
-    prompt="一个人在跳街舞",                        # 必填，动画提示词
-    algorithm_model=None,                          # 可选，如 "VISVISE-TextMotion-V1.1.0"
+    segments=[
+        MotionSegment(text="从站立姿势开始，缓缓抬起右手", num_frames=60),
+        MotionSegment(text="向前走两步", num_frames=90, overlap_frames_with_prev=10),
+    ],
+    algorithm_model="MotusAI-T2M-V1.5",           # 可选，如 "MotusAI-T2M-V1.5"
     output_model_format=OutputModelFormat.FBX,    # 可选，输出格式
-    name="gen_text_motion",                        # 可选，任务名称,
+    name="gen_text_motion",                        # 可选，任务名称
+    enable_rewrite=None,                          # 可选，是否开启 rewrite（默认 True）
+    enable_loop=None,                             # 可选，是否循环播放
+    loop_frames=None,                             # 可选，循环帧数（1~20，仅在 enable_loop=True 时有意义）,
     rtx="caller_rtx",
 )
-# model_ids 包含 4 个 ID，等待其中你需要的那个即可
+
+# 方式二：单段提示词 prompt（segments 为空时回退使用）
+model_ids = client.gen_text_motion(
+    model_path="path/to/model.zip",
+    prompt="一个人在跳街舞",                        # 单段动画提示词
+    algorithm_model=None,                          # 可选，如 "MotusAI-T2M-V1.5"
+    output_model_format=OutputModelFormat.FBX,
+    name="gen_text_motion",
+    duration=None,                                 # 可选，动画时长（仅单段 prompt 模式生效）
+    rtx="caller_rtx",
+)
+# model_ids 通常包含 1 个 ID，单个 model 内部含多个抽卡候选
 ```
 
 ---
