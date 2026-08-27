@@ -53,6 +53,7 @@ def main():
         algorithm_model="VISVISE-MeshGen-V1.0.0",
         output_model_format=OutputModelFormat.FBX,
         face_type=FaceType.TRIANGLE,
+        face_num=30000,  # 目标面数，0~30000，0=默认
         name="example_gen_mid_model",
         rtx=RTX,
     )

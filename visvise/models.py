@@ -171,6 +171,39 @@ class ReduceFace:
         }
 
 
+@dataclass
+class MotionSegment:
+    """文生动画时间轴动作段（多段提示词 segments 的单个元素）。
+
+    与 API 文档中的 ``MotionSegment`` 结构一一对应：
+
+    * ``text``：该段动作描述（必填）。
+    * ``num_frames`` / ``duration``：该段时长，二者必须传一个（二选一，
+      同时提供时以 ``num_frames`` 为准）。
+    * ``overlap_frames_with_prev`` / ``overlap_duration_with_prev``：
+      与上一段之间的过渡（第 1 段无需传）。
+
+    ``index``（段序号）为服务端内部字段，由服务端按数组顺序生成，SDK 不暴露。
+    """
+    text: str
+    num_frames: Optional[int] = None
+    duration: Optional[float] = None
+    overlap_frames_with_prev: Optional[int] = None
+    overlap_duration_with_prev: Optional[float] = None
+
+    def to_dict(self) -> dict:
+        d: dict = {"text": self.text}
+        if self.num_frames is not None:
+            d["num_frames"] = self.num_frames
+        if self.duration is not None:
+            d["duration"] = self.duration
+        if self.overlap_frames_with_prev is not None:
+            d["overlap_frames_with_prev"] = self.overlap_frames_with_prev
+        if self.overlap_duration_with_prev is not None:
+            d["overlap_duration_with_prev"] = self.overlap_duration_with_prev
+        return d
+
+
 # ──────────────────────────────────────────────
 # 响应数据结构
 # ──────────────────────────────────────────────

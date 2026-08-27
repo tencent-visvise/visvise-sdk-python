@@ -282,9 +282,10 @@ model_id = client.gen_mid_model(
     output_model_format=OutputModelFormat.FBX,    # optional, output format (default fbx)
     face_type=FaceType.TRIANGLE,                  # optional, face type
     name="gen_mid_model",                         # optional, task name
+    face_num=None,                                # optional, target face count (0-30000, 0 = default), auto if omitted
     segment_model_id=None,                        # optional, 2D segmentation asset ID (mid-poly only), generate from 2D segmentation result
     model_id_360=None,                            # optional, gen_360 asset ID, generate from gen_360 result
-    group_ids=None,                               # optional, custom part-group NPZ file, group_ids, part_mesh_path, and label_to_id must be provided together
+    group_ids=None,                               # optional, custom part-group NPZ file
     part_mesh_path=None,                          # optional, OBJ file containing all parts
     label_to_id=None,                             # optional, JSON file containing the part-name-to-ID mapping
     rtx="caller_rtx",
@@ -324,6 +325,7 @@ model_id = client.gen_mesh_refine(
     input_model_format="fbx",                     # optional, input format (default fbx)
     name="gen_mesh_refine",                        # optional, task name
     mode=None,                                     # optional, MeshRefineMode.OPTIMIZE(1, default) / DENSIFY(2)
+    face_num=None,                                 # optional, target face count (optimize mode only, 0-50000, 0 = unset)
     color_model=None,                              # optional, colored model used to attach color info,
     rtx="caller_rtx",
 )
@@ -476,18 +478,39 @@ model_id = client.gen_video_motion(
 
 ### gen_text_motion — Text to Animation
 
-Generate animation from a text prompt; returns 4 candidate models (node_type=4). → [Example](examples/gen_text_motion.py)
+Generate animation from text prompts (node_type=4); returns 1 model_id (a single model contains 4 candidates).
+Supports two modes: multi-prompt `segments` (takes priority when non-empty) and single `prompt` (fallback). → [Example](examples/gen_text_motion.py)
 
 ```python
+from visvise import MotionSegment
+
+# Mode 1: multi-prompt segments (1~15 segments)
 model_ids = client.gen_text_motion(
     model_path="path/to/model.zip",               # required, model zip
-    prompt="a person breakdancing",                # required, animation prompt
-    algorithm_model=None,                          # optional, e.g. "VISVISE-TextMotion-V1.1.0"
+    segments=[
+        MotionSegment(text="Raise the right hand slowly", num_frames=60),
+        MotionSegment(text="Walk two steps forward", num_frames=90, overlap_frames_with_prev=10),
+    ],
+    algorithm_model="MotusAI-T2M-V1.5",           # optional, e.g. "MotusAI-T2M-V1.5"
     output_model_format=OutputModelFormat.FBX,    # optional, output format
-    name="gen_text_motion",                        # optional, task name,
+    name="gen_text_motion",                        # optional, task name
+    enable_rewrite=None,                          # optional, enable rewrite (default True)
+    enable_loop=None,                             # optional, loop playback
+    loop_frames=None,                             # optional, loop frames (1~20, only meaningful when enable_loop=True),
     rtx="caller_rtx",
 )
-# model_ids contains 4 IDs, wait for whichever you prefer
+
+# Mode 2: single prompt (fallback when segments is empty)
+model_ids = client.gen_text_motion(
+    model_path="path/to/model.zip",
+    prompt="a person breakdancing",                # single animation prompt
+    algorithm_model=None,                          # optional, e.g. "MotusAI-T2M-V1.5"
+    output_model_format=OutputModelFormat.FBX,
+    name="gen_text_motion",
+    duration=None,                                 # optional, duration in seconds (single-prompt mode only)
+    rtx="caller_rtx",
+)
+# model_ids usually contains 1 ID; a single model holds multiple candidates
 ```
 
 ---

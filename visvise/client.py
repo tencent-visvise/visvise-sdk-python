@@ -24,6 +24,7 @@ from .http import Environment, WeaverHTTPClient
 from .models import (
     GetCosCredResult,
     ImageGen360Style,
+    MotionSegment,
     PreprocessType,
     RemovePatternParam,
     StyleParam,
@@ -906,7 +907,7 @@ class VisviseClient:
             output_model_format: 输出格式，默认 fbx。
             face_type: 面数类型，默认 1。
             name: 任务名称。
-            face_num: 目标面数，范围 (0, 50000]，不传自动配置。
+            face_num: 目标面数，范围 0~30000（0=使用默认值），不传自动配置。
             skip_360_preprocess: 是否跳过图生360前置处理，默认 False（不跳过）。
                 注意：与自定义 Mask 参数（group_ids 等）互斥，同时使用会被服务端拒绝。
             segment_model_id: 2D 分割资产 ID，传入后将基于分割结果生成模型。
@@ -1026,6 +1027,7 @@ class VisviseClient:
         *,
         rtx: str,
         mode: Optional[int] = None,
+        face_num: Optional[int] = None,
         color_model: Optional[FileInput] = None,
     ) -> str:
         """重布线/布线优化（node_type=10）。
@@ -1038,6 +1040,8 @@ class VisviseClient:
             input_model_format: 输入模型格式，默认 fbx。
             name: 任务名称。
             mode: 模式：1 布线优化（默认），2 布线加密。
+            face_num: 目标面数（仅在布线优化 mode=1 时生效），范围 0~50000，
+                0=不设置（使用算法默认），不传自动配置。
             color_model: 带颜色的模型，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
                 传入后将为输出模型附加颜色信息。
         """
@@ -1049,6 +1053,8 @@ class VisviseClient:
         }
         if mode is not None:
             params["mode"] = mode
+        if face_num is not None:
+            params["face_num"] = face_num
         if color_model is not None:
             params["color_model"] = self._resolve_model_file(color_model, rtx=rtx)
 
@@ -1451,38 +1457,97 @@ class VisviseClient:
     def gen_text_motion(
         self,
         model_path: FileInput,
-        prompt: str,
+        prompt: Optional[str] = None,
         algorithm_model: Optional[str] = None,
         output_model_format: str = "fbx",
         name: str = "gen_text_motion",
         *,
         rtx: str,
+        segments: Optional[list[MotionSegment]] = None,
+        enable_rewrite: Optional[bool] = None,
+        duration: Optional[int] = None,
+        enable_loop: Optional[bool] = None,
+        loop_frames: Optional[int] = None,
     ) -> list[str]:
         """文本生动画（node_type=4）。
 
-        一次生成 4 个动画模型供抽卡选择。
+        支持单段提示词（``prompt``）与多段提示词（``segments``）两种模式：
+        ``segments`` 非空时**以多段为准**（``prompt`` 被忽略），否则回退使用
+        ``prompt``（单段）。
 
         Args:
             model_path: 模型 zip 包，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
                 bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名并打包。
-            prompt: 动画提示词（如 "一个人在跳街舞"）。
-            algorithm_model: 文生动画模型（如 ``VISVISE-TextMotion-V1.1.0``）。
-            output_model_format: 输出格式，默认 fbx。
+            prompt: 单段动画提示词（如 ``"一个人在跳街舞"``）。
+                当 ``segments`` 非空时被忽略，以多段为准。
+            algorithm_model: 文生动画模型（如 ``MotusAI-T2M-V1.5``）。
+                可选，若不传则自动获取当前账号可用的第一个文生动画模型。
+            output_model_format: 输出格式，默认 fbx（支持 fbx/bvh）。
             name: 任务名称。
+            segments: 多段提示词列表（1~15 段），参考 :class:`~visvise.models.MotionSegment`。
+                非空时优先于 ``prompt``，以多段为准。
+            enable_rewrite: 是否开启 rewrite 选项，默认 ``True``（服务端默认）。
+                传 ``False`` 可显式关闭。
+            duration: 文生动画生成时长（单位 s）。仅单段 ``prompt`` 模式下生效；
+                ``segments`` 模式由各段自行指定时长。
+            enable_loop: 是否开启循环播放。
+            loop_frames: 循环帧数，输入范围 1~20（仅在 ``enable_loop=True`` 时有意义）。
 
         Returns:
-            4 个新生成的模型 ID 列表（用于抽卡）。
+            新生成的模型 ID 列表（通常 1 个 model_id，单个 model 内部含多个抽卡候选，
+            见 ``framing_ai_output.text2_motion_result``）。
+
+        Raises:
+            ValueError: ``prompt`` 与 ``segments`` 都未传；或 ``segments``
+                数量超出 1~15、某段 ``text`` 为空、某段 ``num_frames`` 与
+                ``duration`` 均未提供时抛出。
         """
+        # ── segments 优先 ──
+        has_prompt = bool(prompt)
+        has_segments = bool(segments)
+        if not has_prompt and not has_segments:
+            raise ValueError(
+                "gen_text_motion 需要提供 prompt（单段）或 segments（多段）至少一个"
+            )
+        if has_segments:
+            if len(segments) > 15:
+                raise ValueError(f"segments 最多支持 15 段，传入了 {len(segments)} 段")
+            for i, seg in enumerate(segments):
+                if not seg.text or not seg.text.strip():
+                    raise ValueError(f"段 {i + 1} 的动作描述不能为空")
+                if (seg.num_frames is None or seg.num_frames <= 0) and (
+                    seg.duration is None or seg.duration <= 0
+                ):
+                    raise ValueError(
+                        f"段 {i + 1} 的 num_frames 与 duration 必须有一个大于 0"
+                    )
+
         model_url = self._resolve_model_file(model_path, rtx=rtx)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.ANIMATION, sub_type=2, rtx=rtx)
+
+        framing: dict = {
+            "algorithm_model": resolved_model,
+            "output_model_format": output_model_format,
+        }
+        if has_segments:
+            # segments 优先：以多段为准，忽略 prompt
+            framing["segments"] = [seg.to_dict() for seg in segments]
+        else:
+            framing["prompt"] = prompt
+            # duration 仅在单段 prompt 模式下生效；segments 模式由各段自行指定时长
+            if duration is not None:
+                framing["duration"] = duration
+        if enable_rewrite is not None:
+            framing["enable_rewrite"] = enable_rewrite
+        if enable_loop is not None:
+            framing["enable_loop"] = enable_loop
+        if loop_frames is not None:
+            framing["loop_frames"] = loop_frames
+
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.ANIMATION,
-            params={"framing_ai_params": {
-                "algorithm_model": resolved_model,
-                "output_model_format": output_model_format,
-                "prompt": prompt,
-            }},
+            params={"framing_ai_params": framing},
             input_model=model_url,
         rtx=rtx,
         )
