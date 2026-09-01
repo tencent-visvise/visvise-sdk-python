@@ -30,6 +30,7 @@ class NodeType:
     IMG_TO_POSE = 12      # 图生 Pose
     IMG_TO_3D_LOW = 13    # 图生3D（低模）
     SEGMENT_2D = 14       # 2D 拆分
+    AUTO_LUV = 15         # 2UV（重生成 regenerate_model）
     PREPROCESS_2D = 16    # 2D 预处理
 
 
@@ -95,6 +96,14 @@ class SegmentGranularity:
     FINE = 3        # 细（×100%）
 
 
+class SegmentViewType:
+    """2D 拆分重新编辑的视图类型枚举 (view_type)"""
+    MAIN = 0        # 主视图（front，默认）
+    LEFT = 1        # 左视图
+    RIGHT = 2       # 右视图
+    BACK = 3        # 背视图
+
+
 class ImageGen360Style:
     """图生 360 风格枚举 (style)。
 
@@ -117,20 +126,32 @@ class ImageGen360Style:
 
 @dataclass
 class View:
-    """多视图结构"""
+    """多视图结构（与 proto ``View`` 9 字段一一对应）"""
     main_view: str
     back_view: Optional[str] = None
     left_view: Optional[str] = None
     right_view: Optional[str] = None
+    top_view: Optional[str] = None
+    bottom_view: Optional[str] = None
+    front_view: Optional[str] = None
+    front_left_view: Optional[str] = None
+    front_right_view: Optional[str] = None
 
     def to_dict(self) -> dict:
         d: dict = {"main_view": self.main_view}
-        if self.back_view:
-            d["back_view"] = self.back_view
-        if self.left_view:
-            d["left_view"] = self.left_view
-        if self.right_view:
-            d["right_view"] = self.right_view
+        for key in (
+            "back_view",
+            "left_view",
+            "right_view",
+            "top_view",
+            "bottom_view",
+            "front_view",
+            "front_left_view",
+            "front_right_view",
+        ):
+            val = getattr(self, key)
+            if val:
+                d[key] = val
         return d
 
 
@@ -162,13 +183,20 @@ class ReduceFace:
     reduce_level: int
     reduce_percent: int
     face_type: int  # 1:三角面 2:四边面
+    face_num: Optional[int] = None          # 保面面数
+    face_tab: Optional[int] = None          # 保面Tab切换, 0-按比例, 1-按面数
 
     def to_dict(self) -> dict:
-        return {
+        d: dict = {
             "reduce_level": self.reduce_level,
             "reduce_percent": self.reduce_percent,
             "face_type": self.face_type,
         }
+        if self.face_num is not None:
+            d["face_num"] = self.face_num
+        if self.face_tab is not None:
+            d["face_tab"] = self.face_tab
+        return d
 
 
 @dataclass
@@ -249,6 +277,7 @@ class UserQuota:
     model_quota: int
     animation_quota: int
     server_ts: int
+    image_processing_quota: int = 0
 
     @classmethod
     def from_dict(cls, d: dict) -> "UserQuota":
@@ -256,6 +285,7 @@ class UserQuota:
             model_quota=d["model_quota"],
             animation_quota=d["animation_quota"],
             server_ts=d["server_ts"],
+            image_processing_quota=d.get("image_processing_quota", 0),
         )
 
 
@@ -264,10 +294,33 @@ class FailedReason:
     """生成失败原因"""
     code: int
     reason: str
+    real_reason: str = ""
 
     @classmethod
     def from_dict(cls, d: dict) -> "FailedReason":
-        return cls(code=d.get("code", -1), reason=d.get("reason", ""))
+        return cls(
+            code=d.get("code", -1),
+            reason=d.get("reason", ""),
+            real_reason=d.get("real_reason", ""),
+        )
+
+
+@dataclass
+class FeedbackItem:
+    """单条反馈"""
+    result_index: int = 0      # 结果索引，普通节点为 1，文生动画节点为 1~4
+    feedback_type: int = 0     # 反馈类型：0=未反馈，1=满意，2=不满意
+    tags: list[str] = field(default_factory=list)  # 问题标签列表
+    content: str = ""          # 反馈文字描述
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "FeedbackItem":
+        return cls(
+            result_index=d.get("result_index", 0),
+            feedback_type=d.get("feedback_type", 0),
+            tags=d.get("tags", []),
+            content=d.get("content", ""),
+        )
 
 
 @dataclass
@@ -291,12 +344,16 @@ class LODOutput:
     """LOD 输出文件集合"""
     lod_files: list[LODFile] = field(default_factory=list)
     zip_file: str = ""
+    del_times: int = 0
+    del_card_indexs: list[int] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: dict) -> "LODOutput":
         return cls(
             lod_files=[LODFile.from_dict(f) for f in d.get("lod_files", [])],
             zip_file=d.get("zip_file", ""),
+            del_times=d.get("del_times", 0),
+            del_card_indexs=d.get("del_card_indexs", []),
         )
 
 
@@ -305,6 +362,8 @@ class ImageGen360Output:
     """图生360 输出结果"""
     output_view: Optional[View] = None
     horizontal_view_video: str = ""
+    vertical_view_video: str = ""
+    horizontal_view_video_frames: str = ""
 
     @classmethod
     def from_dict(cls, d: dict) -> "ImageGen360Output":
@@ -312,6 +371,8 @@ class ImageGen360Output:
         return cls(
             output_view=View(**{k: v for k, v in ov.items() if v}) if ov else None,
             horizontal_view_video=d.get("horizontal_view_video", ""),
+            vertical_view_video=d.get("vertical_view_video", ""),
+            horizontal_view_video_frames=d.get("horizontal_view_video_frames", ""),
         )
 
 
@@ -333,6 +394,8 @@ class Text2Motion:
 class FramingAIOutput:
     """Framing AI 的输出结果"""
     text2_motion_result: list[Text2Motion] = field(default_factory=list)
+    rewrite_prompts: list[str] = field(default_factory=list)
+    rewrite_applied: bool = False
 
     @classmethod
     def from_dict(cls, d: dict) -> "FramingAIOutput":
@@ -340,6 +403,8 @@ class FramingAIOutput:
             text2_motion_result=[
                 Text2Motion.from_dict(m) for m in d.get("text2_motion_result", [])
             ],
+            rewrite_prompts=d.get("rewrite_prompts", []),
+            rewrite_applied=d.get("rewrite_applied", False),
         )
 
 
@@ -366,6 +431,12 @@ class ModelInfo:
     params: Optional[dict] = None       # 原始生成参数（TemplateParams）
     input_view: Optional[dict] = None   # 原始输入视图
     algorithm_model: str = ""           # 使用的算法模型名
+    parent_model_id: str = ""           # 父模型ID
+    works_id: str = ""                  # 作品ID
+    preview_model: str = ""             # 预览用的模型
+    feedbacks: list[FeedbackItem] = field(default_factory=list)  # 反馈详情列表
+    model_type: int = 0                 # 模型类型（Model3DType）
+    rewrite_prompts: list[str] = field(default_factory=list)  # Rewrite 改写后的各段文本
 
     @property
     def is_success(self) -> bool:
@@ -406,4 +477,10 @@ class ModelInfo:
             params=d.get("params"),
             input_view=d.get("input_view"),
             algorithm_model=d.get("algorithm_model", ""),
+            parent_model_id=d.get("parent_model_id", ""),
+            works_id=d.get("works_id", ""),
+            preview_model=d.get("preview_model", ""),
+            feedbacks=[FeedbackItem.from_dict(f) for f in d.get("feedbacks", [])],
+            model_type=d.get("model_type", 0),
+            rewrite_prompts=d.get("rewrite_prompts", []),
         )
