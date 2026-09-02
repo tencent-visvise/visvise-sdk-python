@@ -33,6 +33,7 @@ from .models import (
     ModelStatus,
     NodeType,
     ReduceFace,
+    SegmentViewType,
     UserQuota,
     View,
 )
@@ -824,6 +825,8 @@ class VisviseClient:
         right_view: Optional[FileInput] = None,
         enable_pbr: Optional[bool] = None,
         strict_mode: Optional[bool] = None,
+        segment_model_id: Optional[str] = None,
+        component_label: Optional[int] = None,
     ) -> str:
         """图生高模（node_type=3）。
 
@@ -839,6 +842,8 @@ class VisviseClient:
             back_view / left_view / right_view: 额外视图，同样支持三种输入形式。
             enable_pbr: 是否启用 PBR，可选。
             strict_mode: 是否按照目标面数强制生成，否则按几何误差调整面数，可选。
+            segment_model_id: 2D 分割资产 ID，传入后将基于分割结果生成高模。
+            component_label: 2D 分割资产的单部件 label，配合 segment_model_id 使用。
 
         Returns:
             新生成的模型 ID。
@@ -861,6 +866,10 @@ class VisviseClient:
             img_params["enable_pbr"] = enable_pbr
         if strict_mode is not None:
             img_params["strict_mode"] = strict_mode
+        if segment_model_id is not None:
+            img_params["segment_model_id"] = segment_model_id
+        if component_label is not None:
+            img_params["component_label"] = component_label
 
         return self.api.gen_3d_model(
             name=name,
@@ -888,6 +897,7 @@ class VisviseClient:
         skip_360_preprocess: Optional[bool] = None,
         segment_model_id: Optional[str] = None,
         model_id_360: Optional[str] = None,
+        component_label: Optional[int] = None,
         group_ids: Optional[FileInput] = None,
         part_mesh_path: Optional[FileInput] = None,
         label_to_id: Optional[FileInput] = None,
@@ -912,6 +922,7 @@ class VisviseClient:
                 注意：与自定义 Mask 参数（group_ids 等）互斥，同时使用会被服务端拒绝。
             segment_model_id: 2D 分割资产 ID，传入后将基于分割结果生成模型。
             model_id_360: 360 模型资产 ID，传入后将基于 360 模型生成中模。
+            component_label: 2D 分割资产的单部件 label，配合 segment_model_id 使用。
             group_ids: 自定义部件分组 NPZ 文件，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
             part_mesh_path: 包含所有部件的 OBJ 文件，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
             label_to_id: 部件名称到 ID 映射 JSON 文件，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
@@ -946,6 +957,8 @@ class VisviseClient:
             img_params["segment_model_id"] = segment_model_id
         if model_id_360 is not None:
             img_params["model_id_360"] = model_id_360
+        if component_label is not None:
+            img_params["component_label"] = component_label
         if group_ids is not None:
             img_params["group_ids"] = self._resolve_file(
                 group_ids,
@@ -1029,6 +1042,7 @@ class VisviseClient:
         mode: Optional[int] = None,
         face_num: Optional[int] = None,
         color_model: Optional[FileInput] = None,
+        basecolor_image: Optional[FileInput] = None,
     ) -> str:
         """重布线/布线优化（node_type=10）。
 
@@ -1044,6 +1058,8 @@ class VisviseClient:
                 0=不设置（使用算法默认），不传自动配置。
             color_model: 带颜色的模型，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
                 传入后将为输出模型附加颜色信息。
+            basecolor_image: 基础颜色图片，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
+                传入后将为输出模型附加基础颜色贴图信息。
         """
         cos_url = self._resolve_model_file(model_path, rtx=rtx)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.MESH_REFINE, rtx=rtx)
@@ -1057,6 +1073,8 @@ class VisviseClient:
             params["face_num"] = face_num
         if color_model is not None:
             params["color_model"] = self._resolve_model_file(color_model, rtx=rtx)
+        if basecolor_image is not None:
+            params["basecolor_image"] = self._resolve_file(basecolor_image, rtx=rtx)
 
         return self.api.gen_3d_model(
             name=name,
@@ -1280,6 +1298,7 @@ class VisviseClient:
         algo_scenario: Optional[int] = None,
         temperature: float = -1,
         num_beams: int = -1,
+        enable_auto_skinning: Optional[bool] = None,
     ) -> str:
         """骨骼架设（node_type=5）。
 
@@ -1301,6 +1320,7 @@ class VisviseClient:
             temperature:  高级采用-自由度 取值范围(0~1)            
             num_beams:   高级采用-搜索广度  取值范围(5~15)
             algo_scenario: 生成方式 , mesh_category=humanoid 时设置 1=默认一键自动生成；2=人形角色+上传模版；3=主体骨骼人形角色生成附加骨骼。只有2需要传模板           
+            enable_auto_skinning: 是否开启一键骨骼+蒙皮（algo_scenario=4），可选。
         Returns:
             新生成的模型 ID。
         """
@@ -1330,6 +1350,8 @@ class VisviseClient:
         go_rigging_params: dict = {"algorithm_model": resolved_model}
         if template_skeleton is not None:
             go_rigging_params["template_skeleton"] = self._resolve_model_file(template_skeleton, rtx=rtx)
+        if enable_auto_skinning is not None:
+            go_rigging_params["enable_auto_skinning"] = enable_auto_skinning
 
         return self.api.gen_3d_model(
             name=name,
@@ -1685,3 +1707,262 @@ class VisviseClient:
                 model_id="",
             )
         return new_model_id
+
+    # ── 4.2 2D 拆分重新编辑 ──────────────────────────────────────────────
+
+    def begin_segment(
+        self,
+        client_id: str,
+        component_label: int,
+        *,
+        rtx: str,
+        view_type: int = SegmentViewType.MAIN,
+    ) -> dict:
+        """开始拆分：进入分割状态，指定要拆分的部件。
+
+        Args:
+            client_id: 分割会话 ID（由 :meth:`open_segment` 返回，或由底层
+                ``api.init_segment`` 的 ``reply`` 帧数据中获取）。
+            component_label: 要拆分的部件 label。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，使用 :class:`~visvise.models.SegmentViewType` 常量，默认主视图。
+
+        Returns:
+            单视图操作结果（``OperatorResult`` 字典）。
+        """
+        return self.api.begin_segment(
+            client_id, component_label, rtx=rtx, view_type=view_type
+        )
+
+    def segment_component(
+        self,
+        client_id: str,
+        *,
+        rtx: str,
+        view_type: int = SegmentViewType.MAIN,
+        add_pixels: Optional[list] = None,
+        remove_pixels: Optional[list] = None,
+        rects: Optional[list] = None,
+    ) -> dict:
+        """拆分：在分割状态下圈定要拆出的区域（可反复执行）。
+
+        ``add_pixels`` 为正点（前景像素点）、``remove_pixels`` 为负点（背景像素点）、
+        ``rects`` 为矩形框，三者共同圈定拆分区域。
+
+        Args:
+            client_id: 分割会话 ID。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，使用 :class:`~visvise.models.SegmentViewType` 常量，默认主视图。
+            add_pixels: 正点列表，元素为 ``{"x": int, "y": int}``。
+            remove_pixels: 负点列表，元素为 ``{"x": int, "y": int}``。
+            rects: 矩形框列表，元素为
+                ``{"left_top_pixel": {"x": int, "y": int}, "right_bottom_pixel": {"x": int, "y": int}}``。
+
+        Returns:
+            单视图操作结果（``OperatorResult`` 字典）。
+        """
+        return self.api.segment_component(
+            client_id,
+            rtx=rtx,
+            view_type=view_type,
+            add_pixels=add_pixels,
+            remove_pixels=remove_pixels,
+            rects=rects,
+        )
+
+    def confirm_segment(
+        self,
+        client_id: str,
+        *,
+        rtx: str,
+        view_type: int = SegmentViewType.MAIN,
+    ) -> dict:
+        """确认拆分：固化当前分割结果。
+
+        Args:
+            client_id: 分割会话 ID。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，使用 :class:`~visvise.models.SegmentViewType` 常量，默认主视图。
+
+        Returns:
+            单视图操作结果（``OperatorResult`` 字典）。
+        """
+        return self.api.confirm_segment(client_id, rtx=rtx, view_type=view_type)
+
+    def cancel_segment(
+        self,
+        client_id: str,
+        *,
+        rtx: str,
+        view_type: int = SegmentViewType.MAIN,
+    ) -> dict:
+        """取消拆分：回退到分割开始前的状态。
+
+        Args:
+            client_id: 分割会话 ID。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，使用 :class:`~visvise.models.SegmentViewType` 常量，默认主视图。
+
+        Returns:
+            单视图操作结果（``OperatorResult`` 字典）。
+        """
+        return self.api.cancel_segment(client_id, rtx=rtx, view_type=view_type)
+
+    def merge_component(
+        self,
+        client_id: str,
+        component_labels: list,
+        *,
+        rtx: str,
+        view_type: int = SegmentViewType.MAIN,
+    ) -> dict:
+        """合并：将多个部件合并为一个连通体。
+
+        Args:
+            client_id: 分割会话 ID。
+            component_labels: 要合并的部件 label 列表。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，使用 :class:`~visvise.models.SegmentViewType` 常量，默认主视图。
+
+        Returns:
+            多视图结果（``MultiViewSegmentResult`` 字典）。
+        """
+        return self.api.merge_component(
+            client_id, component_labels, rtx=rtx, view_type=view_type
+        )
+
+    def auto_merge_component(self, client_id: str, *, rtx: str) -> dict:
+        """自动合并：自动合并所有相邻的连通体，无需指定 label。
+
+        Args:
+            client_id: 分割会话 ID。
+            rtx: 实际使用人的 RTX。**必填**。
+
+        Returns:
+            多视图结果（``MultiViewSegmentResult`` 字典）。
+        """
+        return self.api.auto_merge_component(client_id, rtx=rtx)
+
+    def boundary_adjust(
+        self,
+        client_id: str,
+        component_label: int,
+        paint_mask: str,
+        *,
+        rtx: str,
+        view_type: int = SegmentViewType.MAIN,
+    ) -> dict:
+        """修边：通过涂抹区域调整部件边界。
+
+        Args:
+            client_id: 分割会话 ID。
+            component_label: 要调整边界的部件 label。
+            paint_mask: 涂抹区域掩膜的 base64 编码。注意：这是与掩膜尺寸一致的
+                **原始单字节数组**（每像素 1 字节，取值 0~255，非 0 表示涂抹）的 base64，
+                而非 PNG 图片的 base64。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，使用 :class:`~visvise.models.SegmentViewType` 常量，默认主视图。
+
+        Returns:
+            单视图操作结果（``OperatorResult`` 字典）。
+        """
+        return self.api.boundary_adjust(
+            client_id,
+            component_label,
+            paint_mask,
+            rtx=rtx,
+            view_type=view_type,
+        )
+
+    def rename_component(
+        self,
+        client_id: str,
+        component_label: int,
+        new_name: str,
+        *,
+        rtx: str,
+        view_type: int = SegmentViewType.MAIN,
+    ) -> dict:
+        """部件重命名：重命名指定部件，四视图下同步修改所有视图。
+
+        Args:
+            client_id: 分割会话 ID。
+            component_label: 要重命名的部件 label。
+            new_name: 新名称，最长 20 个字符（60 字节）。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，使用 :class:`~visvise.models.SegmentViewType` 常量，默认主视图。
+
+        Returns:
+            多视图结果（``MultiViewSegmentResult`` 字典）。
+        """
+        return self.api.rename_component(
+            client_id, component_label, new_name, rtx=rtx, view_type=view_type
+        )
+
+    def save_segment(
+        self,
+        client_id: str,
+        name: str,
+        *,
+        rtx: str,
+        algorithm_model: Optional[str] = None,
+        opened_model_id: Optional[str] = None,
+    ) -> dict:
+        """保存拆分：将当前分割结果持久化为独立的 2D 分割资产（``node_type=14``）。
+
+        Args:
+            client_id: 分割会话 ID。
+            name: 资产名称，1~100 个字符。
+            rtx: 实际使用人的 RTX。**必填**。
+            algorithm_model: 可选算法模型名称；未传时自动选择当前账号可用的首个 2D 拆分模型。
+            opened_model_id: 二次编辑时打开的原分割资产 ID，用于继承前端传参。
+
+        Returns:
+            模型资产信息（``ModelInfo`` 字典），``node_type=14``，可作为图生模任务的
+            ``segment_model_id``。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        resolved_model = self._resolve_algorithm_model(
+            algorithm_model, NodeType.SEGMENT_2D, rtx=rtx
+        )
+        return self.api.save_segment(
+            client_id,
+            name,
+            resolved_model,
+            rtx=rtx,
+            opened_model_id=opened_model_id,
+        )
+
+    def open_segment(self, model_id: str, *, rtx: str) -> dict:
+        """打开已有拆分：打开已保存的分割资产进行二次编辑，返回新的 ``client_id``。
+
+        Args:
+            model_id: 分割资产的 model_id（``node_type=14``）。
+            rtx: 实际使用人的 RTX。**必填**。
+
+        Returns:
+            多视图结果（``MultiViewSegmentResult`` 字典），其中 ``client_id`` 为新的分割会话 ID。
+        """
+        return self.api.open_segment(model_id, rtx=rtx)
+
+    def regenerate_model(
+        self,
+        model_id: str,
+        *,
+        rtx: str,
+        params: Optional[dict] = None,
+    ) -> None:
+        """原地重生成模型资产（仅支持 2UV，``node_type=15`` AUTO_LUV）。
+
+        Args:
+            model_id: 待重生成的模型 ID。
+            rtx: 实际使用人的 RTX。**必填**。
+            params: 可选，重新生成的参数（``TemplateParams`` 字典）。不传则复用该资产
+                上次生成的参数。
+
+        Returns:
+            None。重生成不返回新的 model_id，原地覆盖，``redo_count`` 递增。
+        """
+        self.api.regenerate_model(model_id, rtx=rtx, params=params)

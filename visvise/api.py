@@ -41,12 +41,15 @@ class VisviseAPI:
     # 2.2  获取文件上传临时凭证
     # ──────────────────────────────────────────────────────────────────────
 
-    def get_cos_cred(self, *, rtx: str, is_temp: bool = False) -> GetCosCredResult:
+    def get_cos_cred(
+        self, *, rtx: str, is_temp: bool = False, is_public: bool = False
+    ) -> GetCosCredResult:
         """获取 COS 临时密钥，用于客户端直传文件。
 
         Args:
             rtx: 实际使用人的 RTX（公司账号）。**必填**。
             is_temp: 是否临时文件（7天后自动删除）。无特殊情况请保持 False。
+            is_public: 是否上传到公有读目录。无特殊情况请保持 False。
 
         Returns:
             :class:`~visvise.models.GetCosCredResult`
@@ -54,8 +57,12 @@ class VisviseAPI:
         Raises:
             WeaverError / 子类: 接口错误
         """
-        # is_temp=False 时不传该字段，避免签名不一致
-        body = {"is_temp": True} if is_temp else {}
+        # is_temp/is_public=False 时不传该字段，避免签名不一致
+        body: dict = {}
+        if is_temp:
+            body["is_temp"] = True
+        if is_public:
+            body["is_public"] = True
         data = self._http.post(
             "openapi/weaver/resource/get_cos_cred",
             body,
@@ -182,6 +189,8 @@ class VisviseAPI:
         limit: int = 20,
         page: int = 1,
         sorter: Optional[dict] = None,
+        model_type_list: Optional[list[int]] = None,
+        last_ts: Optional[int] = None,
     ) -> tuple[list[ModelInfo], int]:
         """拉取模型资产列表。
 
@@ -206,6 +215,10 @@ class VisviseAPI:
             body["keyword"] = keyword
         if sorter:
             body["sorter"] = sorter
+        if model_type_list:
+            body["model_type_list"] = model_type_list
+        if last_ts is not None:
+            body["last_ts"] = last_ts
 
         data = self._http.post("openapi/weaver/resource/get_model_list", body, rtx=rtx)
         models = [ModelInfo.from_dict(m) for m in data.get("model_list", [])]
@@ -305,6 +318,37 @@ class VisviseAPI:
             {"model_ids": model_ids},
             rtx=rtx,
         )
+
+    # ──────────────────────────────────────────────────────────────────────
+    # 2.10b 原地重生成模型资产
+    # ──────────────────────────────────────────────────────────────────────
+
+    def regenerate_model(
+        self,
+        model_id: str,
+        *,
+        rtx: str,
+        params: Optional[dict] = None,
+    ) -> None:
+        """原地重生成模型资产。
+
+        仅支持 2UV 节点（``node_type=15``，AUTO_LUV）资产；其它节点类型服务端会返回
+        「模型类型不支持重新生成」错误。重生成不返回新的 model_id，原地覆盖，
+        ``redo_count`` 递增。
+
+        Args:
+            model_id: 待重生成的模型 ID。
+            rtx: 实际使用人的 RTX。**必填**。
+            params: 可选，重新生成的参数（``TemplateParams`` 字典）。不传则复用该资产
+                上次生成的参数。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {"model_id": model_id}
+        if params is not None:
+            body["params"] = params
+        self._http.post("openapi/weaver/resource/regenerate_model", body, rtx=rtx)
 
     # ──────────────────────────────────────────────────────────────────────
     # 2.11 去除图片背景
@@ -539,3 +583,271 @@ class VisviseAPI:
         if prompt is not None:
             body["prompt"] = prompt
         return self._http.post_sse("openapi/weaver/component/init_segment", body, rtx=rtx)
+
+    # ──────────────────────────────────────────────────────────────────────
+    # 2.14 重新编辑（普通 JSON POST）
+    # ──────────────────────────────────────────────────────────────────────
+
+    def begin_segment(
+        self,
+        client_id: str,
+        component_label: int,
+        *,
+        rtx: str,
+        view_type: int = 0,
+    ):
+        """开始拆分：进入「分割状态」，指定要拆分的部件。
+
+        Args:
+            client_id: 分割会话 ID（由 ``init_segment`` / ``open_segment`` 返回）。
+            component_label: 要拆分的部件 label。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，0 主视图 / 1 左视图 / 2 右视图 / 3 背视图，默认 0。
+
+        Returns:
+            单视图操作结果（``OperatorResult`` 字典）。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {
+            "client_id": client_id,
+            "view_type": view_type,
+            "component_label": component_label,
+        }
+        return self._http.post("openapi/weaver/component/begin_segment", body, rtx=rtx)
+
+    def segment_component(
+        self,
+        client_id: str,
+        *,
+        rtx: str,
+        view_type: int = 0,
+        add_pixels: Optional[list] = None,
+        remove_pixels: Optional[list] = None,
+        rects: Optional[list] = None,
+    ):
+        """拆分：在分割状态下圈定要拆出的区域（可反复执行）。
+
+        ``add_pixels`` 为正点（前景像素点）、``remove_pixels`` 为负点（背景像素点）、
+        ``rects`` 为矩形框，三者共同圈定拆分区域。
+
+        Args:
+            client_id: 分割会话 ID。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，默认 0。
+            add_pixels: 正点列表，元素为 ``{"x": int, "y": int}``。
+            remove_pixels: 负点列表，元素为 ``{"x": int, "y": int}``。
+            rects: 矩形框列表，元素为
+                ``{"left_top_pixel": {"x": int, "y": int}, "right_bottom_pixel": {"x": int, "y": int}}``。
+
+        Returns:
+            单视图操作结果（``OperatorResult`` 字典）。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {"client_id": client_id, "view_type": view_type}
+        if add_pixels:
+            body["add_pixels"] = add_pixels
+        if remove_pixels:
+            body["remove_pixels"] = remove_pixels
+        if rects:
+            body["rects"] = rects
+        return self._http.post("openapi/weaver/component/segment", body, rtx=rtx)
+
+    def confirm_segment(self, client_id: str, *, rtx: str, view_type: int = 0):
+        """确认拆分：固化当前分割结果。
+
+        Args:
+            client_id: 分割会话 ID。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，默认 0。
+
+        Returns:
+            单视图操作结果（``OperatorResult`` 字典）。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {"client_id": client_id, "view_type": view_type}
+        return self._http.post("openapi/weaver/component/confirm_segment", body, rtx=rtx)
+
+    def cancel_segment(self, client_id: str, *, rtx: str, view_type: int = 0):
+        """取消拆分：回退到分割开始前的状态。
+
+        Args:
+            client_id: 分割会话 ID。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，默认 0。
+
+        Returns:
+            单视图操作结果（``OperatorResult`` 字典）。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {"client_id": client_id, "view_type": view_type}
+        return self._http.post("openapi/weaver/component/cancel_segment", body, rtx=rtx)
+
+    def merge_component(
+        self,
+        client_id: str,
+        component_labels: list,
+        *,
+        rtx: str,
+        view_type: int = 0,
+    ):
+        """合并：将多个部件合并为一个连通体。
+
+        Args:
+            client_id: 分割会话 ID。
+            component_labels: 要合并的部件 label 列表。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，默认 0。
+
+        Returns:
+            多视图结果（``MultiViewSegmentResult`` 字典）。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {
+            "client_id": client_id,
+            "component_labels": component_labels,
+            "view_type": view_type,
+        }
+        return self._http.post("openapi/weaver/component/merge", body, rtx=rtx)
+
+    def auto_merge_component(self, client_id: str, *, rtx: str):
+        """自动合并：自动合并所有相邻的连通体，无需指定 label。
+
+        Args:
+            client_id: 分割会话 ID。
+            rtx: 实际使用人的 RTX。**必填**。
+
+        Returns:
+            多视图结果（``MultiViewSegmentResult`` 字典）。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {"client_id": client_id}
+        return self._http.post("openapi/weaver/component/auto_merge", body, rtx=rtx)
+
+    def boundary_adjust(
+        self,
+        client_id: str,
+        component_label: int,
+        paint_mask: str,
+        *,
+        rtx: str,
+        view_type: int = 0,
+    ):
+        """修边：通过涂抹区域调整部件边界。
+
+        Args:
+            client_id: 分割会话 ID。
+            component_label: 要调整边界的部件 label。
+            paint_mask: 涂抹区域掩膜的 base64 编码。注意：这是与掩膜尺寸一致的
+                **原始单字节数组**（每像素 1 字节，取值 0~255，非 0 表示涂抹）的 base64，
+                而非 PNG 图片的 base64。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，默认 0。
+
+        Returns:
+            单视图操作结果（``OperatorResult`` 字典）。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {
+            "client_id": client_id,
+            "view_type": view_type,
+            "paint_mask": paint_mask,
+            "component_label": component_label,
+        }
+        return self._http.post("openapi/weaver/component/boundary_adjust", body, rtx=rtx)
+
+    def rename_component(
+        self,
+        client_id: str,
+        component_label: int,
+        new_name: str,
+        *,
+        rtx: str,
+        view_type: int = 0,
+    ):
+        """部件重命名：重命名指定部件，四视图下同步修改所有视图。
+
+        Args:
+            client_id: 分割会话 ID。
+            component_label: 要重命名的部件 label。
+            new_name: 新名称，最长 20 个字符（60 字节）。
+            rtx: 实际使用人的 RTX。**必填**。
+            view_type: 视图类型，默认 0。
+
+        Returns:
+            多视图结果（``MultiViewSegmentResult`` 字典）。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {
+            "client_id": client_id,
+            "view_type": view_type,
+            "component_label": component_label,
+            "new_name": new_name,
+        }
+        return self._http.post("openapi/weaver/component/part_rename", body, rtx=rtx)
+
+    def save_segment(
+        self,
+        client_id: str,
+        name: str,
+        algorithm_model: str,
+        *,
+        rtx: str,
+        opened_model_id: Optional[str] = None,
+    ):
+        """保存拆分：将当前分割结果持久化为独立的 2D 分割资产（``node_type=14``）。
+
+        Args:
+            client_id: 分割会话 ID。
+            name: 资产名称，1~100 个字符。
+            algorithm_model: 2D 分割算法模型。
+            rtx: 实际使用人的 RTX。**必填**。
+            opened_model_id: 二次编辑时打开的原分割资产 ID，用于继承前端传参。
+
+        Returns:
+            模型资产信息（``ModelInfo`` 字典），``node_type=14``，可作为图生模任务的
+            ``segment_model_id``。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {
+            "client_id": client_id,
+            "name": name,
+            "algorithm_model": algorithm_model,
+        }
+        if opened_model_id:
+            body["opened_model_id"] = opened_model_id
+        return self._http.post("openapi/weaver/component/save_segment", body, rtx=rtx)
+
+    def open_segment(self, model_id: str, *, rtx: str):
+        """打开已有拆分：打开已保存的分割资产进行二次编辑，返回新的 ``client_id``。
+
+        Args:
+            model_id: 分割资产的 model_id（``node_type=14``）。
+            rtx: 实际使用人的 RTX。**必填**。
+
+        Returns:
+            多视图结果（``MultiViewSegmentResult`` 字典），其中 ``client_id`` 为新的
+            分割会话 ID。
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {"model_id": model_id}
+        return self._http.post("openapi/weaver/component/open_segment", body, rtx=rtx)
