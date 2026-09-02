@@ -126,32 +126,20 @@ class ImageGen360Style:
 
 @dataclass
 class View:
-    """多视图结构（与 proto ``View`` 9 字段一一对应）"""
+    """多视图结构"""
     main_view: str
     back_view: Optional[str] = None
     left_view: Optional[str] = None
     right_view: Optional[str] = None
-    top_view: Optional[str] = None
-    bottom_view: Optional[str] = None
-    front_view: Optional[str] = None
-    front_left_view: Optional[str] = None
-    front_right_view: Optional[str] = None
 
     def to_dict(self) -> dict:
         d: dict = {"main_view": self.main_view}
-        for key in (
-            "back_view",
-            "left_view",
-            "right_view",
-            "top_view",
-            "bottom_view",
-            "front_view",
-            "front_left_view",
-            "front_right_view",
-        ):
-            val = getattr(self, key)
-            if val:
-                d[key] = val
+        if self.back_view:
+            d["back_view"] = self.back_view
+        if self.left_view:
+            d["left_view"] = self.left_view
+        if self.right_view:
+            d["right_view"] = self.right_view
         return d
 
 
