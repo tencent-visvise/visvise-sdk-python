@@ -534,6 +534,10 @@ model_ids = client.gen_pose(
 
 对图生 360 输出的多视图进行组件分割（node_type=14，SSE 协议）。生成的分割资产 `model_id` 可作为图生中模/低模的 `segment_model_id` 输入。 → [示例代码](examples/gen_segment_2d.py)
 
+也支持不经过图生360：直接上传本地原画（六视图按需，本地路径自动上传 COS），并设置
+`skip_360_preprocess=True` 跳过 360 前置、可选 `skip_remove_background=True` 跳过去背景。
+→ [示例代码](examples/gen_segment_2d_skip360.py)
+
 ```python
 def on_thinking(content: str):
     print("[思考]", content)
@@ -546,6 +550,7 @@ seg_model_id = client.gen_segment_2d(
     split_type=None,                               # 可选，SegmentSplitType.FRONT_VIEW(1, 默认) / FOUR_VIEW(2, 多视图)
     skip_360_preprocess=None,                      # 可选，是否跳过图生360前置处理，默认 False
     skip_remove_background=None,                   # 可选，是否跳过去背景（默认 False，即跳过360时默认去背景；仅在 skip_360_preprocess=True 时生效）
+    decomposition_plan=None,                       # 可选，拆解 plan（json 文件），本地路径自动上传；为空时不下发
     on_thinking=on_thinking,                       # 可选，处理 thinking 事件的回调,
     rtx="caller_rtx",
 )
@@ -569,6 +574,14 @@ model_info = client.wait_model(
 
 print(model_info.output_model)   # 输出模型下载 URL
 print(model_info.time_cost)      # 耗时（秒）
+
+# 2D 拆分资产（node_type=14）可取完整拆分产物
+so = model_info.segment_output
+if so:
+    print(so.zip_path)                        # 算法拆分产物 zip（签名 URL，24h）
+    print(so.main_view.data_path)             # 正视图 npz
+    print(so.main_view.components[0].label)   # 部件 label（可作为 component_label 送中模）
+    print(so.color_imgs.main_view)            # 正视图彩色预览图
 ```
 
 **异常：**

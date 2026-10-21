@@ -50,4 +50,10 @@ python gen_high_model.py
 
 # 重拓扑
 python gen_retopology.py
+
+# 2D拆分（需要先运行 gen_360.py 设置 MV_360_MODEL_ID）
+python gen_segment_2d.py
+
+# 2D拆分产物 zip_path 的两种获取方式（同样需要 MV_360_MODEL_ID）
+python gen_segment_2d_zip.py
 ```

@@ -535,6 +535,10 @@ model_ids = client.gen_pose(
 
 Component segmentation over multi-views from gen_360 (node_type=14, SSE protocol). The resulting `model_id` can be passed as `segment_model_id` for `gen_mid_model` / `gen_low_model`. → [Example](examples/gen_segment_2d.py)
 
+Gen360 can also be skipped: upload local artwork directly (six views as needed, local paths are
+uploaded to COS automatically) with `skip_360_preprocess=True`, optionally
+`skip_remove_background=True`. → [Example](examples/gen_segment_2d_skip360.py)
+
 ```python
 def on_thinking(content: str):
     print("[thinking]", content)
@@ -547,6 +551,7 @@ seg_model_id = client.gen_segment_2d(
     split_type=None,                               # optional, SegmentSplitType.FRONT_VIEW(1, default) / FOUR_VIEW(2, multi-view)
     skip_360_preprocess=None,                      # optional, skip 360 preprocess, default False
     skip_remove_background=None,                   # optional, skip background removal (default False; only effective when skip_360_preprocess=True)
+    decomposition_plan=None,                       # optional, decomposition plan (json file), local path uploaded automatically; omitted when empty
     on_thinking=on_thinking,                       # optional, callback for thinking events,
     rtx="caller_rtx",
 )
