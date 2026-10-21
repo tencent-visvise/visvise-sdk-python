@@ -574,6 +574,14 @@ model_info = client.wait_model(
 
 print(model_info.output_model)   # 输出模型下载 URL
 print(model_info.time_cost)      # 耗时（秒）
+
+# 2D 拆分资产（node_type=14）可取完整拆分产物
+so = model_info.segment_output
+if so:
+    print(so.zip_path)                        # 算法拆分产物 zip（签名 URL，24h）
+    print(so.main_view.data_path)             # 正视图 npz
+    print(so.main_view.components[0].label)   # 部件 label（可作为 component_label 送中模）
+    print(so.color_imgs.main_view)            # 正视图彩色预览图
 ```
 
 **异常：**

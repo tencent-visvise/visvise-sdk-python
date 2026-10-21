@@ -48,4 +48,10 @@ python gen_high_model.py
 
 # Retopology
 python gen_retopology.py
+
+# 2D segmentation (run gen_360.py first and set MV_360_MODEL_ID)
+python gen_segment_2d.py
+
+# Two ways to get the 2D segmentation output zip_path (also needs MV_360_MODEL_ID)
+python gen_segment_2d_zip.py
 ```

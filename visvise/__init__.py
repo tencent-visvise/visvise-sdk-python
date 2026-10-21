@@ -37,6 +37,10 @@ from .models import (
     MotionSegment,
     NodeType,
     OutputModelFormat,
+    SegmentOutput,
+    SegmentViewData,
+    SegmentComponent,
+    SegmentColorImgs,
     ReduceFace,
     SegmentSplitType,
     SegmentViewType,
@@ -87,4 +91,9 @@ __all__ = [
     "ImageGen360Output",
     "FramingAIOutput",
     "Text2Motion",
+    # 2D 拆分产物
+    "SegmentOutput",
+    "SegmentViewData",
+    "SegmentComponent",
+    "SegmentColorImgs",
 ]

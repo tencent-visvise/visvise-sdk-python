@@ -398,6 +398,103 @@ class FramingAIOutput:
 
 
 @dataclass
+class SegmentComponent:
+    """2D 拆分部件"""
+    label: int = 0                  # 连通体 label，可用于单部件生成
+    color: str = ""                 # 颜色，如 "#b9f75e"
+    name: str = ""                  # 部件名
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "SegmentComponent":
+        return cls(
+            label=d.get("label", 0),
+            color=d.get("color", ""),
+            name=d.get("name", ""),
+        )
+
+
+@dataclass
+class SegmentViewData:
+    """2D 拆分单视图分割数据"""
+    components: list[SegmentComponent] = field(default_factory=list)  # 部件列表
+    shape: list[int] = field(default_factory=list)                    # mask 图尺寸 [H, W]
+    data_path: str = ""                                               # .npz 文件 COS URL（预签名 24h）
+    mask_image_path: str = ""                                         # 灰度 mask PNG COS URL（预签名 24h）
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "SegmentViewData":
+        return cls(
+            components=[SegmentComponent.from_dict(c) for c in d.get("components", [])],
+            shape=list(d.get("shape", [])),
+            data_path=d.get("data_path", ""),
+            mask_image_path=d.get("mask_image_path", ""),
+        )
+
+
+@dataclass
+class SegmentColorImgs:
+    """2D 拆分各视图彩色预览图（均为 COS 预签名 URL，24h 有效）"""
+    main_view: str = ""
+    back_view: str = ""
+    left_view: str = ""
+    right_view: str = ""
+    top_view: str = ""
+    bottom_view: str = ""
+
+
+@dataclass
+class SegmentOutput:
+    """2D 拆分产物，仅 node_type=14 的资产有值。
+
+    各视图按实际参与拆分的情况填充：正视图必有；顶 / 底仅在 skip_360_preprocess=True
+    且传入了对应视图时才有值。
+    """
+    main_view: Optional[SegmentViewData] = None
+    left_view: Optional[SegmentViewData] = None
+    right_view: Optional[SegmentViewData] = None
+    back_view: Optional[SegmentViewData] = None
+    top_view: Optional[SegmentViewData] = None
+    bottom_view: Optional[SegmentViewData] = None
+    origin_view: Optional[View] = None                    # 送算法的原始视图
+    color_imgs: Optional[SegmentColorImgs] = None         # 各视图彩色预览图
+    zip_path: str = ""                                    # 算法拆分产物 zip（预签名 24h）
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "SegmentOutput":
+        def _view(key: str) -> Optional[SegmentViewData]:
+            v = d.get(key)
+            return SegmentViewData.from_dict(v) if v else None
+
+        ov = d.get("origin_view")
+        ci = d.get("color_imgs")
+        return cls(
+            main_view=_view("main_view"),
+            left_view=_view("left_view"),
+            right_view=_view("right_view"),
+            back_view=_view("back_view"),
+            top_view=_view("top_view"),
+            bottom_view=_view("bottom_view"),
+            origin_view=View(
+                main_view=ov.get("main_view", ""),
+                back_view=ov.get("back_view", ""),
+                left_view=ov.get("left_view", ""),
+                right_view=ov.get("right_view", ""),
+                top_view=ov.get("top_view", ""),
+                bottom_view=ov.get("bottom_view", ""),
+            ) if ov else None,
+            color_imgs=SegmentColorImgs(
+                main_view=ci.get("main_view", ""),
+                back_view=ci.get("back_view", ""),
+                left_view=ci.get("left_view", ""),
+                right_view=ci.get("right_view", ""),
+                top_view=ci.get("top_view", ""),
+                bottom_view=ci.get("bottom_view", ""),
+            ) if ci else None,
+            zip_path=d.get("zip_path", ""),
+        )
+
+
+@dataclass
 class ModelInfo:
     """模型资产信息（拉取模型资产列表响应）"""
     model_id: str
@@ -417,6 +514,7 @@ class ModelInfo:
     lod_output: Optional[LODOutput] = None
     image_gen_360_output: Optional[ImageGen360Output] = None
     framing_ai_output: Optional[FramingAIOutput] = None
+    segment_output: Optional[SegmentOutput] = None  # 2D 拆分产物，仅 node_type=14 有值
     params: Optional[dict] = None       # 原始生成参数（TemplateParams）
     input_view: Optional[dict] = None   # 原始输入视图
     algorithm_model: str = ""           # 使用的算法模型名
@@ -463,6 +561,9 @@ class ModelInfo:
             lod_output=LODOutput.from_dict(lod) if lod else None,
             image_gen_360_output=ImageGen360Output.from_dict(i360) if i360 else None,
             framing_ai_output=FramingAIOutput.from_dict(fai) if fai else None,
+            segment_output=SegmentOutput.from_dict(d["segment_output"])
+            if d.get("segment_output")
+            else None,
             params=d.get("params"),
             input_view=d.get("input_view"),
             algorithm_model=d.get("algorithm_model", ""),
