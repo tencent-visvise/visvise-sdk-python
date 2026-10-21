@@ -1627,6 +1627,7 @@ class VisviseClient:
         split_type: Optional[int] = None,
         skip_360_preprocess: Optional[bool] = None,
         skip_remove_background: Optional[bool] = None,
+        decomposition_plan: Optional[str] = None,
         on_thinking: Optional[Callable[[str], None]] = None,
     ) -> str:
         """2D 拆分（node_type=14，SSE 流式接口）。
@@ -1639,10 +1640,11 @@ class VisviseClient:
             algorithm_model: 算法模型，可选。不传则自动选首个可用模型。
             name: 资产名称。
             input_view: 输入视图（与 ``model_id_360`` 二选一）。
-            split_type: 拆分方式：1 正视图（默认）/ 2 多视图（按实际传入的视图，支持 2~6 个）。
+            split_type: 拆分方式：1 正视图（默认）/ 2 多视图（按实际传入的视图，支持 1~6 个）。
             skip_360_preprocess: 是否跳过图生360前置处理，默认 False（不跳过）。
             skip_remove_background: 是否跳过去背景预处理，默认 False（跳过 360 时默认去背景）。
                 仅在 ``skip_360_preprocess=True`` 时生效，为 True 时原始输入图直接送拆分算法。
+            decomposition_plan: 拆解 plan 的 COS 路径，为空时不下发给算法。
             on_thinking: 可选回调，``thinking`` 事件触发时调用，参数为思考内容字符串。
 
         Returns:
@@ -1679,6 +1681,7 @@ class VisviseClient:
             split_type=split_type,
             skip_360_preprocess=skip_360_preprocess,
             skip_remove_background=skip_remove_background,
+            decomposition_plan=decomposition_plan,
             rtx=rtx,
         ):
             event = frame.get("event")

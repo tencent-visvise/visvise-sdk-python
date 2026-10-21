@@ -546,6 +546,7 @@ seg_model_id = client.gen_segment_2d(
     split_type=None,                               # 可选，SegmentSplitType.FRONT_VIEW(1, 默认) / FOUR_VIEW(2, 多视图)
     skip_360_preprocess=None,                      # 可选，是否跳过图生360前置处理，默认 False
     skip_remove_background=None,                   # 可选，是否跳过去背景（默认 False，即跳过360时默认去背景；仅在 skip_360_preprocess=True 时生效）
+    decomposition_plan=None,                       # 可选，拆解 plan 的 COS 路径，为空时不下发给算法
     on_thinking=on_thinking,                       # 可选，处理 thinking 事件的回调,
     rtx="caller_rtx",
 )

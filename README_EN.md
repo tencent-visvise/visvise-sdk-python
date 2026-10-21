@@ -547,6 +547,7 @@ seg_model_id = client.gen_segment_2d(
     split_type=None,                               # optional, SegmentSplitType.FRONT_VIEW(1, default) / FOUR_VIEW(2, multi-view)
     skip_360_preprocess=None,                      # optional, skip 360 preprocess, default False
     skip_remove_background=None,                   # optional, skip background removal (default False; only effective when skip_360_preprocess=True)
+    decomposition_plan=None,                       # optional, decomposition plan COS path, omitted when empty
     on_thinking=on_thinking,                       # optional, callback for thinking events,
     rtx="caller_rtx",
 )
