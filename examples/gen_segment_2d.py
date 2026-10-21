@@ -19,7 +19,7 @@ logging.getLogger("visvise").setLevel(logging.INFO)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from visvise import Environment, VisviseClient, SegmentSplitType, SegmentGranularity
+from visvise import Environment, VisviseClient, SegmentSplitType
 
 APP_ID     = os.environ["VISVISE_APP_ID"]
 SECRET_KEY = os.environ["VISVISE_SECRET_KEY"]
@@ -44,9 +44,7 @@ def main():
 
     seg_model_id = client.gen_segment_2d(
         model_id_360=mv_model_id,
-        split_type=SegmentSplitType.FRONT_VIEW,   # 1 正视图（默认） / 2 四视图
-        granularity=SegmentGranularity.MEDIUM,    # 1 粗 / 2 中（默认） / 3 细
-        prompt=None,            # 可选：自然语言描述拆分规则
+        split_type=SegmentSplitType.FRONT_VIEW,   # 1 正视图（默认） / 2 多视图
         name="example_gen_segment_2d",
         on_thinking=on_thinking,
         rtx=RTX,

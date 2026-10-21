@@ -89,11 +89,6 @@ class SegmentSplitType:
     FOUR_VIEW = 2   # 生成四视图拆分
 
 
-class SegmentGranularity:
-    """2D 拆分颗粒度枚举 (granularity)"""
-    COARSE = 1      # 粗（×50%）
-    MEDIUM = 2      # 中（×70%，默认）
-    FINE = 3        # 细（×100%）
 
 
 class SegmentViewType:
@@ -131,6 +126,8 @@ class View:
     back_view: Optional[str] = None
     left_view: Optional[str] = None
     right_view: Optional[str] = None
+    top_view: Optional[str] = None
+    bottom_view: Optional[str] = None
 
     def to_dict(self) -> dict:
         d: dict = {"main_view": self.main_view}
@@ -140,6 +137,10 @@ class View:
             d["left_view"] = self.left_view
         if self.right_view:
             d["right_view"] = self.right_view
+        if self.top_view:
+            d["top_view"] = self.top_view
+        if self.bottom_view:
+            d["bottom_view"] = self.bottom_view
         return d
 
 
