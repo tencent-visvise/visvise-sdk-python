@@ -534,6 +534,10 @@ model_ids = client.gen_pose(
 
 对图生 360 输出的多视图进行组件分割（node_type=14，SSE 协议）。生成的分割资产 `model_id` 可作为图生中模/低模的 `segment_model_id` 输入。 → [示例代码](examples/gen_segment_2d.py)
 
+也支持不经过图生360：直接上传本地原画（六视图按需，本地路径自动上传 COS），并设置
+`skip_360_preprocess=True` 跳过 360 前置、可选 `skip_remove_background=True` 跳过去背景。
+→ [示例代码](examples/gen_segment_2d_skip360.py)
+
 ```python
 def on_thinking(content: str):
     print("[思考]", content)
