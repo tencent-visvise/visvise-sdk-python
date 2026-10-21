@@ -1625,8 +1625,8 @@ class VisviseClient:
         rtx: str,
         input_view: Optional[View] = None,
         split_type: Optional[int] = None,
-        granularity: Optional[int] = None,
-        prompt: Optional[str] = None,
+        skip_360_preprocess: Optional[bool] = None,
+        skip_remove_background: Optional[bool] = None,
         on_thinking: Optional[Callable[[str], None]] = None,
     ) -> str:
         """2D 拆分（node_type=14，SSE 流式接口）。
@@ -1639,9 +1639,10 @@ class VisviseClient:
             algorithm_model: 算法模型，可选。不传则自动选首个可用模型。
             name: 资产名称。
             input_view: 输入视图（与 ``model_id_360`` 二选一）。
-            split_type: 拆分方式：1 正视图（默认）/ 2 四视图。
-            granularity: 颗粒度：1 粗 / 2 中（默认）/ 3 细。
-            prompt: 拆分提示词。
+            split_type: 拆分方式：1 正视图（默认）/ 2 多视图（按实际传入的视图，支持 2~6 个）。
+            skip_360_preprocess: 是否跳过图生360前置处理，默认 False（不跳过）。
+            skip_remove_background: 是否跳过去背景预处理，默认 False（跳过 360 时默认去背景）。
+                仅在 ``skip_360_preprocess=True`` 时生效，为 True 时原始输入图直接送拆分算法。
             on_thinking: 可选回调，``thinking`` 事件触发时调用，参数为思考内容字符串。
 
         Returns:
@@ -1663,6 +1664,8 @@ class VisviseClient:
                 back_view=self._resolve_file(input_view.back_view, rtx=rtx) if input_view.back_view else None,
                 left_view=self._resolve_file(input_view.left_view, rtx=rtx) if input_view.left_view else None,
                 right_view=self._resolve_file(input_view.right_view, rtx=rtx) if input_view.right_view else None,
+                top_view=self._resolve_file(input_view.top_view, rtx=rtx) if input_view.top_view else None,
+                bottom_view=self._resolve_file(input_view.bottom_view, rtx=rtx) if input_view.bottom_view else None,
             )
 
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.SEGMENT_2D, rtx=rtx)
@@ -1674,9 +1677,9 @@ class VisviseClient:
             model_id=model_id_360,
             input_view=resolved_view,
             split_type=split_type,
-            granularity=granularity,
-            prompt=prompt,
-        rtx=rtx,
+            skip_360_preprocess=skip_360_preprocess,
+            skip_remove_background=skip_remove_background,
+            rtx=rtx,
         ):
             event = frame.get("event")
             data = frame.get("data")

@@ -542,8 +542,8 @@ class VisviseAPI:
         model_id: Optional[str] = None,
         input_view: Optional[View] = None,
         split_type: Optional[int] = None,
-        granularity: Optional[int] = None,
-        prompt: Optional[str] = None,
+        skip_360_preprocess: Optional[bool] = None,
+        skip_remove_background: Optional[bool] = None,
     ):
         """初始化 2D 分割（SSE 流式接口）。
 
@@ -557,9 +557,10 @@ class VisviseAPI:
             rtx: 实际使用人的 RTX。**必填**。
             model_id: 图生 360 的 model_id。
             input_view: 输入视图。
-            split_type: 拆分方式，1 正视图（默认）/ 2 四视图。
-            granularity: 颗粒度，1 粗 / 2 中（默认）/ 3 细。
-            prompt: 拆分提示词（最长 200 字符）。
+            split_type: 拆分方式，1 正视图（默认）/ 2 多视图（按实际传入的视图，支持 2~6 个）。
+            skip_360_preprocess: 是否跳过图生360前置处理，默认 False（不跳过）。
+            skip_remove_background: 是否跳过去背景预处理，默认 False（跳过 360 时默认去背景）。
+                仅在 ``skip_360_preprocess=True`` 时生效，为 True 时原始输入图直接送拆分算法。
 
         Yields:
             事件帧字典 ``{"event": str, "data": Any}``。
@@ -578,10 +579,10 @@ class VisviseAPI:
             body["input_view"] = input_view.to_dict()
         if split_type is not None:
             body["split_type"] = split_type
-        if granularity is not None:
-            body["granularity"] = granularity
-        if prompt is not None:
-            body["prompt"] = prompt
+        if skip_360_preprocess is not None:
+            body["skip_360_preprocess"] = skip_360_preprocess
+        if skip_remove_background is not None:
+            body["skip_remove_background"] = skip_remove_background
         return self._http.post_sse("openapi/weaver/component/init_segment", body, rtx=rtx)
 
     # ──────────────────────────────────────────────────────────────────────

@@ -130,7 +130,7 @@ The SDK exposes the following enum constants. Prefer them over hard-coded number
 ```python
 from visvise import (
     FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
-    SegmentSplitType, SegmentGranularity, ImageGen360Style,
+    SegmentSplitType, ImageGen360Style,
     NodeType, PreprocessType, StyleParam, StyleType,
 )
 
@@ -156,10 +156,6 @@ MeshRefineMode.DENSIFY   # 2 - mesh densification
 SegmentSplitType.FRONT_VIEW  # 1 - front-view split (default)
 SegmentSplitType.FOUR_VIEW   # 2 - four-view split
 
-# 2D segmentation granularity
-SegmentGranularity.COARSE   # 1 - coarse
-SegmentGranularity.MEDIUM   # 2 - medium (default)
-SegmentGranularity.FINE     # 3 - fine
 
 # Image-to-360 style (VISVISE proprietary models only; any other value will be rejected)
 ImageGen360Style.GRAY_MODEL  # "灰模"      - gray model
@@ -197,7 +193,7 @@ The examples below share the following imports:
 from visvise import (
     VisviseClient, Environment,
     FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
-    SegmentSplitType, SegmentGranularity,
+    SegmentSplitType,
     StyleType, ReduceFace, View,
 )
 
@@ -548,9 +544,9 @@ seg_model_id = client.gen_segment_2d(
     algorithm_model=None,                          # optional, e.g. "VISVISE-Seg2D-V1.0.0"
     name="gen_segment_2d",                         # optional, task name
     input_view=None,                               # optional (or pass model_id_360), input view
-    split_type=None,                               # optional, SegmentSplitType.FRONT_VIEW(1, default) / FOUR_VIEW(2)
-    granularity=None,                              # optional, SegmentGranularity.COARSE(1) / MEDIUM(2, default) / FINE(3)
-    prompt=None,                                   # optional, natural-language splitting rule (max 200 chars)
+    split_type=None,                               # optional, SegmentSplitType.FRONT_VIEW(1, default) / FOUR_VIEW(2, multi-view)
+    skip_360_preprocess=None,                      # optional, skip 360 preprocess, default False
+    skip_remove_background=None,                   # optional, skip background removal (default False; only effective when skip_360_preprocess=True)
     on_thinking=on_thinking,                       # optional, callback for thinking events,
     rtx="caller_rtx",
 )

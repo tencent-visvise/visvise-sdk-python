@@ -130,7 +130,7 @@ SDK 提供以下枚举常量，推荐使用枚举替代硬编码数字/字符串
 ```python
 from visvise import (
     FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
-    SegmentSplitType, SegmentGranularity, ImageGen360Style,
+    SegmentSplitType, ImageGen360Style,
     NodeType, PreprocessType, StyleParam, StyleType,
 )
 
@@ -154,12 +154,7 @@ MeshRefineMode.DENSIFY   # 2 - 布线加密
 
 # 2D 拆分方式
 SegmentSplitType.FRONT_VIEW  # 1 - 生成正视图拆分（默认）
-SegmentSplitType.FOUR_VIEW   # 2 - 生成四视图拆分
-
-# 2D 拆分颗粒度
-SegmentGranularity.COARSE   # 1 - 粗
-SegmentGranularity.MEDIUM   # 2 - 中（默认）
-SegmentGranularity.FINE     # 3 - 细
+SegmentSplitType.FOUR_VIEW   # 2 - 生成多视图拆分（按实际传入的视图）
 
 # 图生 360 风格（仅 VISVISE 自研模型支持，传其它值会被服务端拒绝）
 ImageGen360Style.GRAY_MODEL  # "灰模"
@@ -197,7 +192,7 @@ StyleType.CARTOON            # 4 - 卡通手办风
 from visvise import (
     VisviseClient, Environment,
     FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
-    SegmentSplitType, SegmentGranularity,
+    SegmentSplitType,
     StyleType, ReduceFace, View,
 )
 
@@ -548,9 +543,9 @@ seg_model_id = client.gen_segment_2d(
     algorithm_model=None,                          # 可选，如 "VISVISE-Seg2D-V1.0.0"
     name="gen_segment_2d",                         # 可选，任务名称
     input_view=None,                               # 可选（与 model_id_360 二选一），输入视图
-    split_type=None,                               # 可选，SegmentSplitType.FRONT_VIEW(1, 默认) / FOUR_VIEW(2)
-    granularity=None,                              # 可选，SegmentGranularity.COARSE(1) / MEDIUM(2, 默认) / FINE(3)
-    prompt=None,                                   # 可选，自然语言描述拆分规则（最长 200 字符）
+    split_type=None,                               # 可选，SegmentSplitType.FRONT_VIEW(1, 默认) / FOUR_VIEW(2, 多视图)
+    skip_360_preprocess=None,                      # 可选，是否跳过图生360前置处理，默认 False
+    skip_remove_background=None,                   # 可选，是否跳过去背景（默认 False，即跳过360时默认去背景；仅在 skip_360_preprocess=True 时生效）
     on_thinking=on_thinking,                       # 可选，处理 thinking 事件的回调,
     rtx="caller_rtx",
 )
