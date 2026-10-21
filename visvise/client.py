@@ -1627,7 +1627,7 @@ class VisviseClient:
         split_type: Optional[int] = None,
         skip_360_preprocess: Optional[bool] = None,
         skip_remove_background: Optional[bool] = None,
-        decomposition_plan: Optional[str] = None,
+        decomposition_plan: Optional[FileInput] = None,
         on_thinking: Optional[Callable[[str], None]] = None,
     ) -> str:
         """2D 拆分（node_type=14，SSE 流式接口）。
@@ -1644,7 +1644,8 @@ class VisviseClient:
             skip_360_preprocess: 是否跳过图生360前置处理，默认 False（不跳过）。
             skip_remove_background: 是否跳过去背景预处理，默认 False（跳过 360 时默认去背景）。
                 仅在 ``skip_360_preprocess=True`` 时生效，为 True 时原始输入图直接送拆分算法。
-            decomposition_plan: 拆解 plan 的 COS 路径，为空时不下发给算法。
+            decomposition_plan: 拆解 plan（json 文件），可选。支持本地文件路径（自动上传 COS）、
+                bytes / 文件对象，或已上传的 VISVISE 平台 COS URL；为空时不下发给算法。
             on_thinking: 可选回调，``thinking`` 事件触发时调用，参数为思考内容字符串。
 
         Returns:
@@ -1672,6 +1673,16 @@ class VisviseClient:
 
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.SEGMENT_2D, rtx=rtx)
 
+        # 拆解 plan 为 json 文件：本地路径沿用原文件名，bytes / 文件对象嗅探不到扩展名兜底 .json
+        resolved_plan: Optional[str] = None
+        if decomposition_plan:
+            if isinstance(decomposition_plan, str):
+                resolved_plan = self._resolve_file(decomposition_plan, rtx=rtx)
+            else:
+                resolved_plan = self._resolve_file(
+                    decomposition_plan, rtx=rtx, filename="decomposition_plan.json"
+                )
+
         new_model_id: Optional[str] = None
         for frame in self.api.init_segment(
             name=name,
@@ -1681,7 +1692,7 @@ class VisviseClient:
             split_type=split_type,
             skip_360_preprocess=skip_360_preprocess,
             skip_remove_background=skip_remove_background,
-            decomposition_plan=decomposition_plan,
+            decomposition_plan=resolved_plan,
             rtx=rtx,
         ):
             event = frame.get("event")
