@@ -54,6 +54,6 @@ python gen_retopology.py
 # 2D拆分（需要先运行 gen_360.py 设置 MV_360_MODEL_ID）
 python gen_segment_2d.py
 
-# 2D拆分产物 zip_path 的两种获取方式（同样需要 MV_360_MODEL_ID）
+# 2D拆分产物 zip_path 的两种获取方式（上传本地六视图，跳过360与去背景；素材目录用 SEG_ASSETS_DIR 指定）
 python gen_segment_2d_zip.py
 ```
