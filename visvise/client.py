@@ -1652,6 +1652,10 @@ class VisviseClient:
             分割资产的 model_id（从 ``pre_create`` 事件中提取），生成完成后可用于
             后续图生模任务的 ``segment_model_id``。
 
+            注意：返回只保证拿到了 model_id，**不保证拆分已完成**。若 SSE 流被中断
+            （网关空闲读超时 / 服务端重启等），本方法会在收到 ``reply`` 前提前返回，
+            此时任务仍在服务端执行，需自行调用 :meth:`wait_model` 确认状态后再使用。
+
         Raises:
             ValueError: ``model_id_360`` 与 ``input_view`` 都未传时抛出。
             ModelGenerationError: SSE 流返回 error 事件时抛出。
