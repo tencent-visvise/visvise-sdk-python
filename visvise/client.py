@@ -1054,8 +1054,8 @@ class VisviseClient:
             input_model_format: 输入模型格式，默认 fbx。
             name: 任务名称。
             mode: 模式：1 布线优化（默认），2 布线加密。
-            face_num: 目标面数（仅在布线优化 mode=1 时生效），范围 0~50000，
-                0=不设置（使用算法默认），不传自动配置。
+            face_num: 目标面数（仅在布线优化 mode=1 时生效），取值范围 (0,50000]，
+                0 表示自动面数，不传自动配置。
             color_model: 带颜色的模型，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
                 传入后将为输出模型附加颜色信息。
             basecolor_image: 基础颜色图片，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。

@@ -31,7 +31,7 @@ def main():
         algorithm_model="VISVISE-MeshRefine-V1.0.0",
         input_model_format="fbx",
         mode=1,        # 1 布线优化（默认），2 布线加密
-        face_num=50000,  # 目标面数（布线优化 mode=1 生效），0~50000，0=不设置
+        face_num=50000,  # 目标面数（布线优化 mode=1 生效），(0,50000]，0 表示自动面数
         name="example_gen_mesh_refine",
         rtx=RTX,
     )

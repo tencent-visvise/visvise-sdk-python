@@ -321,7 +321,7 @@ model_id = client.gen_mesh_refine(
     input_model_format="fbx",                     # optional, input format (default fbx)
     name="gen_mesh_refine",                        # optional, task name
     mode=None,                                     # optional, MeshRefineMode.OPTIMIZE(1, default) / DENSIFY(2)
-    face_num=None,                                 # optional, target face count (optimize mode only, 0-50000, 0 = unset)
+    face_num=None,                                 # optional, target face count (optimize mode only, (0,50000], 0 = auto)
     color_model=None,                              # optional, colored model used to attach color info,
     rtx="caller_rtx",
 )
