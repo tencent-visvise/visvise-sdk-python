@@ -197,9 +197,13 @@ class WeaverHTTPClient:
             read_timeout: SSE 读超时（秒），默认 1200s（20 分钟）。SSE 流式接口可能持续较久
                 （如 2D 拆分需要逐个部件分割），单独设置较长超时；连接超时仍使用 client 的 timeout。
 
+        流被中断（网关空闲读超时 / 服务端重启 / 网络抖动）时，若已收到过至少一帧则不抛异常，
+        只记录一条 warning 并正常结束迭代 —— 服务端任务仍在跑，调用方应拿 `pre_create` 事件里的
+        model_id 调 `wait_model` 轮询最终结果；若一帧都没收到才抛 NetworkError。
+
         Raises:
             ValueError: rtx 为空。
-            NetworkError: 网络异常 / 非 SSE 响应。
+            NetworkError: 网络异常 / 非 SSE 响应 / 未收到任何帧就中断。
         """
         if body is None:
             body = {}
@@ -265,27 +269,45 @@ class WeaverHTTPClient:
         # 以下是原有的 SSE 处理逻辑
         event = None
         data_lines: list[str] = []
-        for raw_line in resp.iter_lines(decode_unicode=True):
-            if raw_line is None:
-                continue
-            if raw_line == "":
-                # 空行表示一帧结束
-                if event is not None or data_lines:
-                    data_str = "\n".join(data_lines)
-                    try:
-                        data_val: Any = json.loads(data_str) if data_str else None
-                    except ValueError:
-                        data_val = data_str
-                    yield {"event": event or "message", "data": data_val}
-                event = None
-                data_lines = []
-                continue
-            if raw_line.startswith(":"):
-                continue  # 注释
-            if raw_line.startswith("event:"):
-                event = raw_line[len("event:"):].strip()
-            elif raw_line.startswith("data:"):
-                data_lines.append(raw_line[len("data:"):].lstrip())
+        received = 0
+        try:
+            for raw_line in resp.iter_lines(decode_unicode=True):
+                if raw_line is None:
+                    continue
+                if raw_line == "":
+                    # 空行表示一帧结束
+                    if event is not None or data_lines:
+                        data_str = "\n".join(data_lines)
+                        try:
+                            data_val: Any = json.loads(data_str) if data_str else None
+                        except ValueError:
+                            data_val = data_str
+                        received += 1
+                        yield {"event": event or "message", "data": data_val}
+                    event = None
+                    data_lines = []
+                    continue
+                if raw_line.startswith(":"):
+                    continue  # 注释
+                if raw_line.startswith("event:"):
+                    event = raw_line[len("event:"):].strip()
+                elif raw_line.startswith("data:"):
+                    data_lines.append(raw_line[len("data:"):].lstrip())
+        except requests.exceptions.RequestException as e:
+            # 流被中断：网关空闲读超时 / 服务端重启 / 网络抖动。
+            # 只要已经收到过至少一帧，就当作流正常结束，不抛异常 —— 服务端任务仍在跑，
+            # 调用方可以拿 pre_create 里的 model_id 去 wait_model 轮询最终结果。
+            if received > 0:
+                logger.warning(
+                    "SSE 流在收到 %d 帧后被中断（%s: %s）。服务端任务可能仍在执行，"
+                    "建议用已获取的 model_id 调用 wait_model 轮询最终结果。"
+                    "常见原因是中间网关空闲读超时（SSE 链路无心跳）。",
+                    received, type(e).__name__, e,
+                )
+                return
+            raise NetworkError(
+                f"SSE 连接在收到任何事件前中断: {type(e).__name__}: {e}"
+            ) from e
 
         # 收尾：可能最后一帧没有结尾空行
         if event is not None or data_lines:

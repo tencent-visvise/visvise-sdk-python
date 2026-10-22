@@ -320,7 +320,7 @@ model_id = client.gen_mesh_refine(
     input_model_format=OutputModelFormat.FBX,                     # 可选，输入模型格式（默认 fbx）
     name="gen_mesh_refine",                        # 可选，任务名称
     mode=None,                                     # 可选，MeshRefineMode.OPTIMIZE(1, 默认) / DENSIFY(2)
-    face_num=None,                                 # 可选，目标面数（仅布线优化 mode=1 生效，0~50000，0=不设置）
+    face_num=None,                                 # 可选，目标面数（仅布线优化 mode=1 生效，(0,50000]，0 表示自动面数）
     color_model=None,                              # 可选，带颜色的模型，用于为输出附加颜色,
     rtx="caller_rtx",
 )

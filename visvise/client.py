@@ -1054,8 +1054,8 @@ class VisviseClient:
             input_model_format: 输入模型格式，默认 fbx。
             name: 任务名称。
             mode: 模式：1 布线优化（默认），2 布线加密。
-            face_num: 目标面数（仅在布线优化 mode=1 时生效），范围 0~50000，
-                0=不设置（使用算法默认），不传自动配置。
+            face_num: 目标面数（仅在布线优化 mode=1 时生效），取值范围 (0,50000]，
+                0 表示自动面数，不传自动配置。
             color_model: 带颜色的模型，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
                 传入后将为输出模型附加颜色信息。
             basecolor_image: 基础颜色图片，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
@@ -1651,6 +1651,10 @@ class VisviseClient:
         Returns:
             分割资产的 model_id（从 ``pre_create`` 事件中提取），生成完成后可用于
             后续图生模任务的 ``segment_model_id``。
+
+            注意：返回只保证拿到了 model_id，**不保证拆分已完成**。若 SSE 流被中断
+            （网关空闲读超时 / 服务端重启等），本方法会在收到 ``reply`` 前提前返回，
+            此时任务仍在服务端执行，需自行调用 :meth:`wait_model` 确认状态后再使用。
 
         Raises:
             ValueError: ``model_id_360`` 与 ``input_view`` 都未传时抛出。
