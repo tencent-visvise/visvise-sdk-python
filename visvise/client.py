@@ -1146,6 +1146,7 @@ class VisviseClient:
         *,
         rtx: str,
         gen_times: int = 3,
+        enable_qc: bool = False,
     ) -> list[str]:
         """LOD 减面（node_type=2）。
 
@@ -1158,9 +1159,12 @@ class VisviseClient:
             output_model_format: 输出格式，默认 fbx。
             name: 任务名称。
             gen_times: 生成次数（用于抽卡），不需要抽卡传 1，建议传 3。
+            enable_qc: 是否开启质检择优。开启后服务端会在同一档位的多个候选里打分选出最优，
+                结果见 :class:`~visvise.models.LODOutput` 的 ``qc_status`` /
+                ``qc_best_version`` / ``qc_file``（需自行调用 :meth:`wait_model` 取回）。
 
         Returns:
-            模型 ID 列表（gen_times=3 时返回 3 个 ID）。
+            模型 ID 列表（按减面档位数返回，每个档位一个模型 ID）。
         """
         cos_url = self._resolve_model_file(model_path, rtx=rtx)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.LOD, rtx=rtx)
@@ -1172,6 +1176,7 @@ class VisviseClient:
                 "output_model_format": output_model_format,
                 "reduce_faces": [rf.to_dict() for rf in reduce_faces],
                 "gen_times": gen_times,
+                "enable_qc": enable_qc,
             }},
             input_model=cos_url,
         rtx=rtx,
