@@ -318,6 +318,9 @@ class LODFile:
     reduce_level: int
     download_url: str
     preview_img: str = ""
+    # 候选标识 version1/version2/...，按算法返回的原始次序编号；
+    # 与 LODOutput.qc_best_version 对应，用于定位质检选中了哪个候选
+    version: str = ""
 
     @classmethod
     def from_dict(cls, d: dict) -> "LODFile":
@@ -325,6 +328,7 @@ class LODFile:
             reduce_level=d.get("reduce_level", 0),
             download_url=d.get("download_url", ""),
             preview_img=d.get("preview_img", ""),
+            version=d.get("version", ""),
         )
 
 
@@ -335,6 +339,14 @@ class LODOutput:
     zip_file: str = ""
     del_times: int = 0
     del_card_indexs: list[int] = field(default_factory=list)
+    # 以下为 LOD 质检择优（enable_qc=true）时的结果字段，未开启质检时均为空
+    # 空=未开启质检 / completed=全部候选出分 / partial=部分候选出分 /
+    # failed=质检跑了但无候选出分 / call_failed=质检服务没调通
+    qc_status: str = ""
+    # 质检选中的最优候选 version，可用 LODFile.version 比对定位；兜底时为空
+    qc_best_version: str = ""
+    # 质检选中的单个候选（算法侧产物，实测为只含该候选的 zip）；兜底时为第一个候选
+    qc_file: str = ""
 
     @classmethod
     def from_dict(cls, d: dict) -> "LODOutput":
@@ -343,6 +355,9 @@ class LODOutput:
             zip_file=d.get("zip_file", ""),
             del_times=d.get("del_times", 0),
             del_card_indexs=d.get("del_card_indexs", []),
+            qc_status=d.get("qc_status", ""),
+            qc_best_version=d.get("qc_best_version", ""),
+            qc_file=d.get("qc_file", ""),
         )
 
 
