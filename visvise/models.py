@@ -48,6 +48,13 @@ class StyleType:
     CARTOON = 4           # 卡通手办风
 
 
+class ImageCutoutMode:
+    """图片抠图模式枚举 (mode)。"""
+    DIRECT = 1        # 直接抠图（输出透明背景）
+    SOLID_COLOR = 2   # 纯色底抠图
+    REPLACE = 3       # 换底并抠图
+
+
 class ModelStatus:
     """模型资产状态码"""
     INVALID = 0     # 无效
@@ -276,6 +283,31 @@ class UserQuota:
             server_ts=d["server_ts"],
             image_processing_quota=d.get("image_processing_quota", 0),
         )
+
+
+@dataclass
+class ImageCutoutResult:
+    """image_cutout 接口响应（图片抠图结果）。"""
+
+    image_list: list[str] = field(default_factory=list)
+    # 抠图结果图片的 COS URL 列表（带临时签名，24h 有效），按输入图片顺序返回
+    background_color: str = ""
+    # 最终使用的底色（英文色名）；算法未返回时沿用请求传入的值
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "ImageCutoutResult":
+        """from_dict 从接口响应字典构造 ImageCutoutResult。"""
+        return cls(
+            image_list=list(d.get("image_list", [])),
+            background_color=d.get("background_color", ""),
+        )
+
+    def __getitem__(self, key: str):
+        """__getitem__ 支持字典式取值，兼容接口文档示例 result["image_list"] 的写法。"""
+        try:
+            return getattr(self, key)
+        except AttributeError as e:
+            raise KeyError(key) from e
 
 
 @dataclass

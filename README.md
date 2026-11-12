@@ -34,6 +34,7 @@ VISVISE Weaver OpenAPI 的 Python SDK，提供：
   - [gen_pose — 图生Pose](#gen_pose--图生pose)
   - [gen_segment_2d — 2D 拆分](#gen_segment_2d--2d-拆分)
   - [wait_model — 等待完成](#wait_model--等待完成)
+  - [image_cutout — 图片抠图](#image_cutout--图片抠图)
 - [原子 API 方法参考](#原子-api-方法参考)
 - [异常说明](#异常说明)
 - [完整流程示例](#完整流程示例)
@@ -45,13 +46,13 @@ VISVISE Weaver OpenAPI 的 Python SDK，提供：
 直接从 GitHub 仓库安装（包含 COS 上传依赖）：
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.1.1
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.2.2
 ```
 
 或通过 SSH：
 
 ```bash
-pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.1.1
+pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.2.2
 ```
 
 > **注：** 安装后即包含腾讯云 COS SDK，可直接使用本地文件自动上传功能，无需额外安装。
@@ -132,6 +133,7 @@ from visvise import (
     FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
     SegmentSplitType, ImageGen360Style,
     NodeType, PreprocessType, StyleParam, StyleType,
+    ImageCutoutMode,
 )
 
 # 面数类型
@@ -171,6 +173,11 @@ StyleType.GRAYSCALE          # 1 - 灰模风
 StyleType.PIXEL              # 2 - 像素风
 StyleType.REALISTIC          # 3 - 写实风
 StyleType.CARTOON            # 4 - 卡通手办风
+
+# 图片抠图模式
+ImageCutoutMode.DIRECT        # 1 - 直接抠图（输出透明背景，默认）
+ImageCutoutMode.SOLID_COLOR   # 2 - 纯色底抠图
+ImageCutoutMode.REPLACE       # 3 - 换底并抠图
 ```
 
 ---
@@ -300,6 +307,7 @@ model_id = client.gen_low_model(
     output_model_format=OutputModelFormat.FBX,    # 可选，输出格式
     face_type=FaceType.TRIANGLE,                  # 可选，面数类型
     name="gen_low_model",                          # 可选，任务名称
+    face_num=None,                                 # 可选，生成面数（100~60000），不传由服务端自动配置
     back_view=None,                                # 可选，背视图
     left_view=None,                                # 可选，左视图
     right_view=None,                               # 可选，右视图,
@@ -593,6 +601,36 @@ if so:
 
 ---
 
+### image_cutout — 图片抠图
+
+对图片执行抠图（去背景）处理，支持**直接抠图** / **纯色底抠图** / **换底并抠图**三种模式。
+同步接口，只返回处理结果图片，**不创建模型资产**。→ [示例代码](examples/image_cutout.py)
+
+```python
+# 抠图为同步接口，服务端算法最长可能耗时数分钟，请放大客户端超时
+client = VisviseClient(app_id="...", secret_key="...", timeout=300)
+
+result = client.image_cutout(
+    images=[                              # 必填，待抠图图片列表（本地路径 / VISVISE 平台 COS URL / bytes / BinaryIO）
+        "path/to/character.png",
+        "path/to/character_2.png",
+    ],
+    mode=ImageCutoutMode.DIRECT,           # 可选，抠图模式，默认 1（直接抠图，输出透明背景）
+    background_color="white",              # 可选，底色（英文色名），默认 "white"
+    rtx="caller_rtx",
+)
+
+print(result.image_list)         # 抠图结果图片地址列表（带临时签名，24h 有效）
+print(result.background_color)   # 最终使用的底色
+```
+
+> **注意：**
+> 1. 输入图片必须位于调用账号自己的 COS 目录下；使用本地路径 / bytes 时 SDK 会自动上传到当前账号目录。
+> 2. 抠图为同步接口，请将客户端 `timeout` 设为至少 300 秒（默认 30 秒会超时）。
+> 3. 返回的结果图片 URL 带临时签名，24h 内有效，透传时不要删除 query 参数。
+
+---
+
 ## 原子 API 方法参考
 
 通过 `client.api.xxx(rtx="caller_rtx")` 访问底层接口：
@@ -626,6 +664,16 @@ client.api.batch_delete_model(["Model2026...", "Model2026..."], rtx="caller_rtx"
 
 # 去除背景
 out_url = client.api.remove_bg("https://cos.../image.png", rtx="caller_rtx")
+
+# 图片抠图（原子接口，image_list 需为已上传的 VISVISE 平台 COS URL）
+cutout = client.api.image_cutout(
+    ["https://cos.../image.png"],
+    ImageCutoutMode.DIRECT,     # 1 直接抠图 / 2 纯色底抠图 / 3 换底并抠图
+    "white",                    # 底色（英文色名）
+    rtx="caller_rtx",
+)
+print(cutout.image_list)        # 抠图结果图片地址列表
+print(cutout.background_color)  # 最终底色
 
 # 文生动画提示词列表
 prompts = client.api.get_text2motion_prompt_list(language="zh", rtx="caller_rtx")

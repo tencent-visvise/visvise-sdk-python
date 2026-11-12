@@ -31,6 +31,7 @@ def main():
         algorithm_model=None,
         output_model_format=OutputModelFormat.FBX,
         face_type=FaceType.TRIANGLE,
+        face_num=20000,
         name="example_gen_low_model",
         rtx=RTX,
     )

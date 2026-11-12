@@ -29,6 +29,8 @@ from .models import (
     FaceType,
     FramingAIOutput,
     GetCosCredResult,
+    ImageCutoutMode,
+    ImageCutoutResult,
     ImageGen360Output,
     ImageGen360Style,
     MeshRefineMode,
@@ -53,7 +55,7 @@ from .models import (
     View,
 )
 
-__version__ = "1.1.1"
+__version__ = "1.2.2"
 __all__ = [
     "VisviseClient",
     "FileInput",
@@ -96,4 +98,7 @@ __all__ = [
     "SegmentViewData",
     "SegmentComponent",
     "SegmentColorImgs",
+    # 图片抠图
+    "ImageCutoutMode",
+    "ImageCutoutResult",
 ]

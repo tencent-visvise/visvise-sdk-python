@@ -23,6 +23,8 @@ from .exceptions import ModelGenerationError, PollingTimeoutError, WeaverError
 from .http import Environment, WeaverHTTPClient
 from .models import (
     GetCosCredResult,
+    ImageCutoutMode,
+    ImageCutoutResult,
     ImageGen360Style,
     MotionSegment,
     PreprocessType,
@@ -996,6 +998,7 @@ class VisviseClient:
         name: str = "gen_low_model",
         *,
         rtx: str,
+        face_num: Optional[int] = None,
         back_view: Optional[FileInput] = None,
         left_view: Optional[FileInput] = None,
         right_view: Optional[FileInput] = None,
@@ -1007,6 +1010,8 @@ class VisviseClient:
                 bytes/BinaryIO 时 SDK 自动用 uuid 生成文件名。
             algorithm_model: 算法模型（如 ``Tripo-v1.0-快速生成``）。
                 可选，若不传则自动获取当前账号可用的第一个模型。
+            face_num: 可选，生成面数，取值范围 100~60000；不传则不下发该字段，
+                由服务端 / 算法自动配置。
             back_view / left_view / right_view: 可选额外视图。
         """
         view = View(
@@ -1021,6 +1026,8 @@ class VisviseClient:
             "output_model_format": output_model_format,
             "face_type": face_type,
         }
+        if face_num is not None:
+            img_params["face_num"] = face_num
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.IMG_TO_3D_LOW,
@@ -1992,3 +1999,40 @@ class VisviseClient:
             None。重生成不返回新的 model_id，原地覆盖，``redo_count`` 递增。
         """
         self.api.regenerate_model(model_id, rtx=rtx, params=params)
+
+    # ── 2.25 图片抠图 ────────────────────────────────────────────────────
+
+    def image_cutout(
+        self,
+        images: list[FileInput],
+        mode: int = ImageCutoutMode.DIRECT,
+        background_color: str = "white",
+        *,
+        rtx: str,
+    ) -> ImageCutoutResult:
+        """图片抠图：上传本地图片并执行抠图（去背景）处理。
+
+        同步接口，只返回处理结果图片，不创建模型资产。
+
+        Args:
+            images: 待抠图图片列表，每个元素支持本地路径、VISVISE 平台 COS URL
+                或 bytes/BinaryIO；本地与二进制输入由 SDK 自动上传到当前账号的
+                COS 目录（服务端只允许访问调用账号自己的文件）。
+            mode: 抠图模式，参考 :class:`~visvise.models.ImageCutoutMode`，
+                默认 ``DIRECT``（=1，直接抠图，输出透明背景）。
+            background_color: 底色，英文色名，如 ``white``、``red``，默认 ``white``。
+            rtx: 实际使用人的 RTX。**必填**。
+
+        Returns:
+            :class:`~visvise.models.ImageCutoutResult`
+
+        Raises:
+            ValueError: ``mode`` 不在 1~3，或 ``background_color`` 为空。
+            WeaverError / 子类: 上传或接口调用失败。
+
+        .. note::
+           抠图为**同步接口**，服务端算法最长可能耗时数分钟，
+           请将客户端 ``timeout`` 设为至少 300 秒（默认 30 秒会超时）。
+        """
+        uploaded = [self._resolve_file(img, rtx=rtx) for img in images]
+        return self.api.image_cutout(uploaded, mode, background_color, rtx=rtx)

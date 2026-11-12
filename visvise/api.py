@@ -14,6 +14,8 @@ from typing import Optional
 from .http import WeaverHTTPClient
 from .models import (
     GetCosCredResult,
+    ImageCutoutMode,
+    ImageCutoutResult,
     ImageGen360Output,
     ModelInfo,
     UserQuota,
@@ -856,3 +858,51 @@ class VisviseAPI:
         """
         body: dict = {"model_id": model_id}
         return self._http.post("openapi/weaver/component/open_segment", body, rtx=rtx)
+
+    # ──────────────────────────────────────────────────────────────────────
+    # 2.25  图片抠图
+    # ──────────────────────────────────────────────────────────────────────
+
+    def image_cutout(
+        self,
+        image_list: list[str],
+        mode: int,
+        background_color: str,
+        *,
+        rtx: str,
+    ) -> ImageCutoutResult:
+        """图片抠图：对图片执行抠图（去背景）处理。
+
+        同步接口，只返回处理结果图片，不创建模型资产。
+
+        Args:
+            image_list: 待抠图图片的 VISVISE 平台 COS URL 列表（建议 1~6 张）；
+                可携带临时签名参数，服务端会先去除签名再校验路径。
+                图片数量与路径归属由服务端校验。
+            mode: 抠图模式，参考 :class:`~visvise.models.ImageCutoutMode`。
+            background_color: 底色，英文色名，如 ``white``、``red``。
+            rtx: 实际使用人的 RTX。**必填**。
+
+        Returns:
+            :class:`~visvise.models.ImageCutoutResult`
+
+        Raises:
+            ValueError: ``mode`` 不在 1~3，或 ``background_color`` 为空。
+            WeaverError / 子类: 接口错误
+        """
+        if mode not in (
+            ImageCutoutMode.DIRECT,
+            ImageCutoutMode.SOLID_COLOR,
+            ImageCutoutMode.REPLACE,
+        ):
+            raise ValueError(f"mode 仅支持 1/2/3（参考 ImageCutoutMode），传入了 {mode!r}")
+        if not background_color or not background_color.strip():
+            raise ValueError("background_color 不能为空（英文色名，如 white / red）")
+
+        body: dict = {
+            "image_list": list(image_list),
+            "mode": int(mode),
+            "background_color": background_color,
+        }
+        data = self._http.post("openapi/weaver/resource/image_cutout", body, rtx=rtx)
+        return ImageCutoutResult.from_dict(data or {})
