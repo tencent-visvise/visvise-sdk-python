@@ -33,6 +33,8 @@ VISVISE Weaver OpenAPI 的 Python SDK，提供：
   - [gen_text_motion — 文本生动画](#gen_text_motion--文本生动画)
   - [gen_pose — 图生Pose](#gen_pose--图生pose)
   - [gen_segment_2d — 2D 拆分](#gen_segment_2d--2d-拆分)
+  - [cond_part_autofit — 裸模拆分](#cond_part_autofit--裸模拆分)
+  - [model_auto_merge — 模型自动合并](#model_auto_merge--模型自动合并)
   - [wait_model — 等待完成](#wait_model--等待完成)
 - [原子 API 方法参考](#原子-api-方法参考)
 - [异常说明](#异常说明)
@@ -178,6 +180,8 @@ StyleType.CARTOON            # 4 - 卡通手办风
 ## 高阶方法参考
 
 高阶方法封装了「COS 文件上传 + 创建任务」流程，传入文件路径（本地）或 COS URL 均可，返回 `model_id`。除 `gen_style_transfer` / `gen_patter_auto_remove` 为同步处理外，其他 `gen_xxx()` 方法通常创建异步任务。
+
+`cond_part_autofit`（裸模拆分）与 `model_auto_merge`（模型自动合并）同样是**同步接口**：直接返回处理结果对象，**不创建模型资产**，无需调用 `wait_model()`。
 
 > **关于 `algorithm_model` 参数：** 所有 gen_xxx 方法的 `algorithm_model` 参数均为可选。若不传，SDK 将自动调用 `list_algorithm_model` 获取当前账号可用的第一个算法模型。
 
@@ -560,6 +564,85 @@ mid_id = client.gen_mid_model(..., segment_model_id=seg_model_id, rtx="caller_rt
 
 ---
 
+### cond_part_autofit — 裸模拆分
+
+将原始模型中的指定部件替换为对应的**裸模**（如无头身体裸模），并输出合并后的模型。
+**同步接口**，只返回处理结果模型，**不创建模型资产**，无需调用 `wait_model()`。
+
+> ⚠️ 服务端算法最长执行 5 分钟，请将客户端 `timeout` 设为至少 330 秒：
+> `VisviseClient(app_id, secret_key, timeout=330)`
+
+| 参数 | 必填 | 说明 |
+|---|---|---|
+| `original_part_mesh_path` | ✅ | 原始模型的 COS 路径（本地路径 / bytes 由 SDK 自动上传），需位于调用账号自己的 COS 目录下 |
+| `ref_mesh_path` | ✅ | 参考模型的 COS 路径（本地路径 / bytes 由 SDK 自动上传） |
+| `replace_part_names` | — | 部件名 → 裸模文件名映射，如 `{"无头身体裸模": "female_headless.obj"}`；不传则不替换任何部件 |
+| `rtx` | ✅ | 实际使用人的 RTX |
+
+**返回** `CondPartAutofitResult`：
+
+| 字段 | 说明 |
+|---|---|
+| `output_obj_path` | 拆分合并后 obj 的 COS 地址（带临时签名，24h 有效） |
+| `background_color` | 最终使用的底色（英文色名），算法未返回时为空字符串 |
+
+```python
+result = client.cond_part_autofit(
+    original_part_mesh_path="path/to/original_model.obj",   # 必填，原始模型（本地路径自动上传）
+    ref_mesh_path="path/to/ref_model.obj",                  # 必填，参考模型（本地路径自动上传）
+    replace_part_names={"无头身体裸模": "female_headless.obj"},  # 可选，部件名 → 裸模文件名
+    rtx="caller_rtx",
+)
+print(result.output_obj_path)    # 拆分合并后 obj 的 COS 地址（临时签名，24h 有效）
+print(result.background_color)   # 最终底色（英文色名）
+print(result["output_obj_path"])  # 也支持字典风格访问
+```
+
+---
+
+### model_auto_merge — 模型自动合并
+
+将拆分得到的多个部件 mesh 合并为一个完整模型（中模 / 高模），并可使用参考模型补齐
+原始部件包中缺失的部件。**同步接口**，只返回处理结果模型，**不创建模型资产**
+（不会出现在「获取模型资产列表」中）。
+
+> ⚠️ 服务端算法最长执行 5 分钟，请将客户端 `timeout` 设为至少 330 秒。
+> ⚠️ `original_part_mesh_path` 必须是 `.zip` 结尾的部件包，否则服务端返回 `120008`；
+> SDK 不做此限制。
+
+| 参数 | 必填 | 说明 |
+|---|---|---|
+| `original_part_mesh_path` | ✅ | 部件 mesh 的 zip 压缩包路径（本地路径 / bytes 由 SDK 自动上传） |
+| `ref_mesh_path` | — | 参考模型的 obj（本地路径 / bytes 由 SDK 自动上传）；传入后算法用参考模型补齐缺失部件 |
+| `support_rotate` | — | 是否支持旋转，默认 `False` |
+| `rtx` | ✅ | 实际使用人的 RTX |
+
+**返回** `ModelAutoMergeResult`：
+
+| 字段 | 说明 |
+|---|---|
+| `output_obj_path` | 合并后模型的 COS 地址（带临时签名，24h 有效） |
+| `elapsed_time` | 算法耗时（秒） |
+| `ref_filled_parts` | 参考模型补齐的部件名列表；未传 `ref_mesh_path` 时为空 |
+| `part_bbox_iou` | 部件名 → 该部件与参考部件的 bbox IoU |
+| `mean_bbox_iou` | 所有部件的平均 bbox IoU（越接近 1 说明合并贴合度越好） |
+
+```python
+result = client.model_auto_merge(
+    original_part_mesh_path="path/to/parts.zip",   # 必填，部件 mesh 压缩包（本地路径自动上传）
+    ref_mesh_path="path/to/ref_model.obj",          # 可选，参考模型，用于补齐缺失部件
+    support_rotate=False,                           # 可选，是否支持旋转，默认 False
+    rtx="caller_rtx",
+)
+print(result.output_obj_path)    # 合并后模型的 COS 地址（临时签名，24h 有效）
+print(result.elapsed_time)       # 算法耗时（秒）
+print(result.ref_filled_parts)   # 参考模型补齐的部件名列表
+print(result.part_bbox_iou)      # 部件名 → bbox IoU
+print(result.mean_bbox_iou)      # 平均 bbox IoU
+```
+
+---
+
 ### wait_model — 等待完成
 
 轮询等待异步任务完成，返回 `ModelInfo`。
@@ -629,6 +712,24 @@ out_url = client.api.remove_bg("https://cos.../image.png", rtx="caller_rtx")
 
 # 文生动画提示词列表
 prompts = client.api.get_text2motion_prompt_list(language="zh", rtx="caller_rtx")
+
+# 裸模拆分（同步接口）
+nude = client.api.cond_part_autofit(
+    original_part_mesh_path="https://cos.../original_model.obj",
+    ref_mesh_path="https://cos.../ref_model.obj",
+    replace_part_names={"无头身体裸模": "female_headless.obj"},
+    rtx="caller_rtx",
+)
+print(nude.output_obj_path)     # 也支持 nude["output_obj_path"]
+
+# 模型自动合并（同步接口）
+merged = client.api.model_auto_merge(
+    original_part_mesh_path="https://cos.../parts.zip",
+    ref_mesh_path="https://cos.../ref_model.obj",
+    support_rotate=False,
+    rtx="caller_rtx",
+)
+print(merged.mean_bbox_iou)
 ```
 
 ---
@@ -764,6 +865,41 @@ model_ids = client.gen_lod(
 results = [client.wait_model(mid, timeout=300, rtx="caller_rtx") for mid in model_ids]
 for r in results:
     print(r.model_id, r.output_model)
+```
+
+---
+
+### 示例四：裸模拆分 → 模型自动合并
+
+两个接口都是同步接口，直接返回处理结果模型，**不创建模型资产**，无需调用 `wait_model()`。
+
+```python
+from visvise import VisviseClient
+
+# 服务端算法最长执行 5 分钟 → 放宽客户端超时
+client = VisviseClient(app_id="...", secret_key="...", timeout=330)
+
+# Step 1: 裸模拆分 —— 将指定部件替换为对应裸模
+nude = client.cond_part_autofit(
+    original_part_mesh_path="original_model.obj",              # 本地路径，自动上传
+    ref_mesh_path="ref_model.obj",                             # 本地路径，自动上传
+    replace_part_names={"无头身体裸模": "female_headless.obj"}, # 部件名 → 裸模文件名
+    rtx="caller_rtx",
+)
+print("拆分结果:", nude.output_obj_path)
+print("最终底色:", nude.background_color)
+
+# Step 2: 模型自动合并 —— 合并部件 mesh，并用参考模型补齐缺失部件
+merged = client.model_auto_merge(
+    original_part_mesh_path="parts.zip",      # 部件 mesh zip 包，自动上传
+    ref_mesh_path="ref_model.obj",            # 可选，参考模型
+    support_rotate=False,
+    rtx="caller_rtx",
+)
+print("合并结果:", merged.output_obj_path)
+print("算法耗时:", merged.elapsed_time, "秒")
+print("参考模型补齐部件:", merged.ref_filled_parts)
+print("平均 bbox IoU:", merged.mean_bbox_iou)
 ```
 
 ---

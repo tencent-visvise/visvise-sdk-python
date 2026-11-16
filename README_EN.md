@@ -182,6 +182,8 @@ StyleType.CARTOON            # 4 - cartoon figurine
 
 High-level methods bundle "COS upload + task creation" into a single call. Pass either a local file path or a VISVISE COS URL; each method returns a `model_id`. `gen_style_transfer` / `gen_patter_auto_remove` are synchronous; other `gen_xxx()` methods usually create asynchronous tasks.
 
+`cond_part_autofit` (nude model split) and `model_auto_merge` (model auto merge) are also **synchronous**: they return the processed result object directly, **do not create a model asset**, and need no `wait_model()` call.
+
 > **About `algorithm_model`:** Every `gen_xxx` method's `algorithm_model` is optional. When omitted, the SDK calls `list_algorithm_model` and uses the first available model for the current account.
 
 > **About file inputs:** All file parameters (e.g. `main_view` / `model_path` / `video_path` / `input_images`) accept three forms:
@@ -573,6 +575,20 @@ need to call `wait_model()`.
 > ⚠️ The server-side algorithm runs for up to 5 minutes. Set the client `timeout` to at least
 > 330 seconds: `VisviseClient(app_id, secret_key, timeout=330)`
 
+| Parameter | Required | Description |
+|---|---|---|
+| `original_part_mesh_path` | ✅ | COS path of the original model (local path / bytes are uploaded by the SDK); must be under the caller's own COS directory |
+| `ref_mesh_path` | ✅ | COS path of the reference model (local path / bytes are uploaded by the SDK) |
+| `replace_part_names` | — | Part name → nude model file name mapping, e.g. `{"无头身体裸模": "female_headless.obj"}`; omit to replace nothing |
+| `rtx` | ✅ | The RTX of the actual user |
+
+**Returns** `CondPartAutofitResult`:
+
+| Field | Description |
+|---|---|
+| `output_obj_path` | COS URL of the merged obj (temporary signature, valid for 24h) |
+| `background_color` | Final background color (English color name); empty when the algorithm returns none |
+
 ```python
 result = client.cond_part_autofit(
     original_part_mesh_path="path/to/original_model.obj",   # required, original model (local path is uploaded automatically)
@@ -595,6 +611,23 @@ interface: it only returns the processed model and **does not create a model ass
 > ⚠️ The server-side algorithm runs for up to 5 minutes; set the client `timeout` to at least 330 seconds.
 > ⚠️ `original_part_mesh_path` must end with `.zip` (a part package), otherwise the server
 > returns `120008`; the SDK does not enforce this.
+
+| Parameter | Required | Description |
+|---|---|---|
+| `original_part_mesh_path` | ✅ | Path to the zipped part mesh package (local path / bytes are uploaded by the SDK) |
+| `ref_mesh_path` | — | Reference model obj (local path / bytes are uploaded by the SDK); when provided, the algorithm fills in the missing parts from it |
+| `support_rotate` | — | Whether rotation is supported, default `False` |
+| `rtx` | ✅ | The RTX of the actual user |
+
+**Returns** `ModelAutoMergeResult`:
+
+| Field | Description |
+|---|---|
+| `output_obj_path` | COS URL of the merged model (temporary signature, valid for 24h) |
+| `elapsed_time` | Algorithm elapsed seconds |
+| `ref_filled_parts` | Part names filled in from the reference model; empty when `ref_mesh_path` is omitted |
+| `part_bbox_iou` | Part name → bbox IoU against the reference part |
+| `mean_bbox_iou` | Mean bbox IoU of all parts (closer to 1 means a better fit) |
 
 ```python
 result = client.model_auto_merge(
@@ -825,6 +858,42 @@ model_ids = client.gen_lod(
 results = [client.wait_model(mid, timeout=300, rtx="caller_rtx") for mid in model_ids]
 for r in results:
     print(r.model_id, r.output_model)
+```
+
+---
+
+### Example 4: Nude model split → Model auto merge
+
+Both interfaces are synchronous and return the processed model directly — no model asset is
+created and `wait_model()` is not needed.
+
+```python
+from visvise import VisviseClient
+
+# The server-side algorithm runs for up to 5 minutes → widen the client timeout
+client = VisviseClient(app_id="...", secret_key="...", timeout=330)
+
+# Step 1: Nude model split — replace the given parts with the nude models
+nude = client.cond_part_autofit(
+    original_part_mesh_path="original_model.obj",              # local path, uploaded automatically
+    ref_mesh_path="ref_model.obj",                             # local path, uploaded automatically
+    replace_part_names={"无头身体裸模": "female_headless.obj"}, # part name → nude model file name
+    rtx="caller_rtx",
+)
+print("Split result:", nude.output_obj_path)
+print("Background color:", nude.background_color)
+
+# Step 2: Model auto merge — merge the part meshes, filling in missing parts from the reference
+merged = client.model_auto_merge(
+    original_part_mesh_path="parts.zip",      # zipped part meshes, uploaded automatically
+    ref_mesh_path="ref_model.obj",            # optional reference model
+    support_rotate=False,
+    rtx="caller_rtx",
+)
+print("Merged model:", merged.output_obj_path)
+print("Elapsed:", merged.elapsed_time, "s")
+print("Parts filled from reference:", merged.ref_filled_parts)
+print("Mean bbox IoU:", merged.mean_bbox_iou)
 ```
 
 ---
