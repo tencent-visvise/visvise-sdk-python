@@ -33,6 +33,8 @@ Python SDK for the VISVISE Weaver OpenAPI. It provides:
   - [gen_text_motion — Text to Animation](#gen_text_motion--text-to-animation)
   - [gen_pose — Image to Pose](#gen_pose--image-to-pose)
   - [gen_segment_2d — 2D Segmentation](#gen_segment_2d--2d-segmentation)
+  - [cond_part_autofit — Nude Model Split](#cond_part_autofit--nude-model-split)
+  - [model_auto_merge — Model Auto Merge](#model_auto_merge--model-auto-merge)
   - [wait_model — Wait for Completion](#wait_model--wait-for-completion)
 - [Atomic API Methods](#atomic-api-methods)
 - [Exceptions](#exceptions)
@@ -561,6 +563,55 @@ mid_id = client.gen_mid_model(..., segment_model_id=seg_model_id, rtx="caller_rt
 
 ---
 
+### cond_part_autofit — Nude Model Split
+
+Replaces the specified parts of the original model with the corresponding **nude models**
+(e.g. a headless body nude model) and outputs the merged model. **Synchronous** interface:
+it only returns the processed model and **does not create a model asset**, so there is no
+need to call `wait_model()`.
+
+> ⚠️ The server-side algorithm runs for up to 5 minutes. Set the client `timeout` to at least
+> 330 seconds: `VisviseClient(app_id, secret_key, timeout=330)`
+
+```python
+result = client.cond_part_autofit(
+    original_part_mesh_path="path/to/original_model.obj",   # required, original model (local path is uploaded automatically)
+    ref_mesh_path="path/to/ref_model.obj",                  # required, reference model (local path is uploaded automatically)
+    replace_part_names={"无头身体裸模": "female_headless.obj"},  # optional, part name → nude model file name
+    rtx="caller_rtx",
+)
+print(result.output_obj_path)    # COS URL of the merged obj (temporary signature, valid for 24h)
+print(result.background_color)   # final background color (English color name)
+```
+
+---
+
+### model_auto_merge — Model Auto Merge
+
+Merges multiple part meshes into one complete model (mid-poly / high-poly), optionally using
+a reference model to fill in the parts missing from the original part package. **Synchronous**
+interface: it only returns the processed model and **does not create a model asset**.
+
+> ⚠️ The server-side algorithm runs for up to 5 minutes; set the client `timeout` to at least 330 seconds.
+> ⚠️ `original_part_mesh_path` must end with `.zip` (a part package), otherwise the server
+> returns `120008`; the SDK does not enforce this.
+
+```python
+result = client.model_auto_merge(
+    original_part_mesh_path="path/to/parts.zip",   # required, part mesh package (local path is uploaded automatically)
+    ref_mesh_path="path/to/ref_model.obj",          # optional, reference model used to fill in missing parts
+    support_rotate=False,                           # optional, whether rotation is supported (default False)
+    rtx="caller_rtx",
+)
+print(result.output_obj_path)    # COS URL of the merged model (temporary signature, valid for 24h)
+print(result.elapsed_time)       # algorithm elapsed seconds
+print(result.ref_filled_parts)   # part names filled in from the reference model
+print(result.part_bbox_iou)      # part name → bbox IoU
+print(result.mean_bbox_iou)      # mean bbox IoU
+```
+
+---
+
 ### wait_model — Wait for Completion
 
 Poll until an async task finishes; returns `ModelInfo`.
@@ -622,6 +673,24 @@ out_url = client.api.remove_bg("https://cos.../image.png", rtx="caller_rtx")
 
 # Text-to-motion prompt suggestions
 prompts = client.api.get_text2motion_prompt_list(language="en", rtx="caller_rtx")
+
+# Nude model split (synchronous)
+nude = client.api.cond_part_autofit(
+    original_part_mesh_path="https://cos.../original_model.obj",
+    ref_mesh_path="https://cos.../ref_model.obj",
+    replace_part_names={"无头身体裸模": "female_headless.obj"},
+    rtx="caller_rtx",
+)
+print(nude.output_obj_path)     # dict-style access also works: nude["output_obj_path"]
+
+# Model auto merge (synchronous)
+merged = client.api.model_auto_merge(
+    original_part_mesh_path="https://cos.../parts.zip",
+    ref_mesh_path="https://cos.../ref_model.obj",
+    support_rotate=False,
+    rtx="caller_rtx",
+)
+print(merged.mean_bbox_iou)
 ```
 
 ---

@@ -13,8 +13,10 @@ from typing import Optional
 
 from .http import WeaverHTTPClient
 from .models import (
+    CondPartAutofitResult,
     GetCosCredResult,
     ImageGen360Output,
+    ModelAutoMergeResult,
     ModelInfo,
     UserQuota,
     View,
@@ -856,3 +858,99 @@ class VisviseAPI:
         """
         body: dict = {"model_id": model_id}
         return self._http.post("openapi/weaver/component/open_segment", body, rtx=rtx)
+
+    # ──────────────────────────────────────────────────────────────────────
+    # 2.26  裸模拆分（同步接口，不创建模型资产）
+    # ──────────────────────────────────────────────────────────────────────
+
+    def cond_part_autofit(
+        self,
+        original_part_mesh_path: str,
+        ref_mesh_path: str,
+        *,
+        rtx: str,
+        replace_part_names: Optional[dict[str, str]] = None,
+    ) -> CondPartAutofitResult:
+        """裸模拆分：将原始模型中的指定部件替换为对应的裸模，并输出合并后的模型。
+
+        该接口为**同步接口**，只返回处理结果模型，**不创建模型资产**。
+
+        Args:
+            original_part_mesh_path: 原始模型的 COS 路径，需位于调用账号自己的 COS 目录下。
+            ref_mesh_path: 参考模型的 COS 路径，需位于调用账号自己的 COS 目录下。
+            rtx: 实际使用人的 RTX。**必填**。
+            replace_part_names: 可选，需要替换的部件名 → 裸模文件名映射，
+                如 ``{"无头身体裸模": "female_headless.obj"}``；不传则不替换任何部件。
+                裸模文件由服务端裸模库按文件名解析，无需上传。
+
+        Returns:
+            :class:`~visvise.models.CondPartAutofitResult`
+
+        Raises:
+            WeaverError / 子类: 接口错误
+
+        Note:
+            同步处理最长可能需要 5 分钟（服务端 ctx 超时 5m），请将客户端
+            ``timeout`` 设为至少 330 秒。
+        """
+        body: dict = {
+            "original_part_mesh_path": original_part_mesh_path,
+            "ref_mesh_path": ref_mesh_path,
+        }
+        if replace_part_names:
+            body["replace_part_names"] = replace_part_names
+
+        data = self._http.post(
+            "openapi/weaver/resource/cond_part_autofit",
+            body,
+            rtx=rtx,
+        )
+        return CondPartAutofitResult.from_dict(data or {})
+
+    # ──────────────────────────────────────────────────────────────────────
+    # 2.27  模型自动合并（同步接口，不创建模型资产）
+    # ──────────────────────────────────────────────────────────────────────
+
+    def model_auto_merge(
+        self,
+        original_part_mesh_path: str,
+        *,
+        rtx: str,
+        ref_mesh_path: Optional[str] = None,
+        support_rotate: bool = False,
+    ) -> ModelAutoMergeResult:
+        """模型自动合并：将拆分得到的多个部件 mesh 合并为一个完整模型。
+
+        该接口为**同步接口**，只返回处理结果模型，**不创建模型资产**（不会出现在
+        获取模型资产列表中）。
+
+        Args:
+            original_part_mesh_path: 输入部件 mesh 的 COS 路径（服务端要求必须以
+                ``.zip`` 结尾，否则返回 ``120008``），需位于调用账号自己的 COS 目录下。
+            rtx: 实际使用人的 RTX。**必填**。
+            ref_mesh_path: 可选，参考模型的 obj COS 路径；传入后算法会用参考模型
+                补齐缺失部件，不传则只做部件合并。
+            support_rotate: 可选，是否支持旋转，默认 ``False``。
+
+        Returns:
+            :class:`~visvise.models.ModelAutoMergeResult`
+
+        Raises:
+            WeaverError / 子类: 接口错误
+
+        Note:
+            同步处理最长可能需要 5 分钟，请将客户端 ``timeout`` 设为至少 330 秒。
+        """
+        body: dict = {
+            "original_part_mesh_path": original_part_mesh_path,
+            "support_rotate": support_rotate,
+        }
+        if ref_mesh_path:
+            body["ref_mesh_path"] = ref_mesh_path
+
+        data = self._http.post(
+            "openapi/weaver/model_auto_merge",
+            body,
+            rtx=rtx,
+        )
+        return ModelAutoMergeResult.from_dict(data or {})

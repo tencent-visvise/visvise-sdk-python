@@ -6,8 +6,9 @@ VISVISE Weaver SDK - 数据模型（dataclass）
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 
 # ──────────────────────────────────────────────
@@ -588,4 +589,74 @@ class ModelInfo:
             feedbacks=[FeedbackItem.from_dict(f) for f in d.get("feedbacks", [])],
             model_type=d.get("model_type", 0),
             rewrite_prompts=d.get("rewrite_prompts", []),
+        )
+
+
+# ──────────────────────────────────────────────
+# 裸模拆分 / 模型自动合并（同步接口，不创建模型资产）
+# ──────────────────────────────────────────────
+
+
+class _DictAccessMixin:
+    """让 dataclass 同时支持 ``obj["field"]`` 风格访问，兼容 API 文档示例写法。"""
+
+    def __getitem__(self, key: str) -> Any:
+        """按字段名取值，等价于 ``obj.field``；字段不存在时抛 KeyError。"""
+        if key in {f.name for f in dataclasses.fields(self)}:
+            return getattr(self, key)
+        raise KeyError(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """按字段名取值，字段不存在时返回 default。"""
+        if key in {f.name for f in dataclasses.fields(self)}:
+            return getattr(self, key)
+        return default
+
+
+@dataclass
+class CondPartAutofitResult(_DictAccessMixin):
+    """裸模拆分接口响应（cond_part_autofit）。
+
+    * ``output_obj_path``：拆分合并后 obj 的 COS 路径（带临时签名，24h 有效）
+    * ``background_color``：最终使用的底色（英文色名），算法未返回时为空字符串
+    """
+
+    output_obj_path: str = ""
+    background_color: str = ""
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "CondPartAutofitResult":
+        """从接口响应的 data 字段构造结果对象。"""
+        return cls(
+            output_obj_path=d.get("output_obj_path", ""),
+            background_color=d.get("background_color", ""),
+        )
+
+
+@dataclass
+class ModelAutoMergeResult(_DictAccessMixin):
+    """模型自动合并接口响应（model_auto_merge）。
+
+    * ``output_obj_path``：合并后模型的 COS 路径（带临时签名，24h 有效）
+    * ``elapsed_time``：算法耗时（秒）
+    * ``ref_filled_parts``：参考模型补齐的部件名列表
+    * ``part_bbox_iou``：部件名 → 该部件与参考部件的 bbox IoU
+    * ``mean_bbox_iou``：所有部件的平均 bbox IoU
+    """
+
+    output_obj_path: str = ""
+    elapsed_time: float = 0.0
+    ref_filled_parts: list[str] = field(default_factory=list)
+    part_bbox_iou: dict[str, float] = field(default_factory=dict)
+    mean_bbox_iou: float = 0.0
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "ModelAutoMergeResult":
+        """从接口响应的 data 字段构造结果对象。"""
+        return cls(
+            output_obj_path=d.get("output_obj_path", ""),
+            elapsed_time=d.get("elapsed_time", 0.0),
+            ref_filled_parts=list(d.get("ref_filled_parts", [])),
+            part_bbox_iou=dict(d.get("part_bbox_iou", {})),
+            mean_bbox_iou=d.get("mean_bbox_iou", 0.0),
         )

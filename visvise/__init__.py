@@ -25,6 +25,7 @@ from .exceptions import (
     WeaverError,
 )
 from .models import (
+    CondPartAutofitResult,
     DetailLevel,
     FaceType,
     FramingAIOutput,
@@ -32,6 +33,7 @@ from .models import (
     ImageGen360Output,
     ImageGen360Style,
     MeshRefineMode,
+    ModelAutoMergeResult,
     ModelInfo,
     ModelStatus,
     MotionSegment,
@@ -96,4 +98,7 @@ __all__ = [
     "SegmentViewData",
     "SegmentComponent",
     "SegmentColorImgs",
+    # 裸模拆分 / 模型自动合并
+    "CondPartAutofitResult",
+    "ModelAutoMergeResult",
 ]
