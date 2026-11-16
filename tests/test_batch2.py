@@ -50,6 +50,13 @@ run("mid face_type=2 fbx", lambda: check("mid face_type=2 fbx",
         rtx=RTX,),
     {"image_gen_model_params.face_type": 2, "image_gen_model_params.output_model_format": "fbx"}))
 
+# gen_mid_model: model_size（期望生成的模型尺寸，单位 cm）
+run("mid model_size=100.0", lambda: check("mid model_size=100.0",
+    client.gen_mid_model(MV["main"],MV["back"],MV["left"],MV["right"],
+        "VISVISE-MeshGen-V1.0.0", face_type=1, output_model_format="fbx", model_size=100.0, name="opt_mid_c",
+        rtx=RTX,),
+    {"image_gen_model_params.model_size": 100.0}))
+
 # gen_retopology: detail_level variations
 run("rtp detail=2 face=2", lambda: check("rtp detail=2 face=2",
     client.gen_retopology(str(ASSETS/"tex_model.obj"), "hunyuan3D-RTP-v1.5",

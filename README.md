@@ -282,6 +282,7 @@ model_id = client.gen_mid_model(
     face_type=FaceType.TRIANGLE,                  # 可选，面数类型
     name="gen_mid_model",                         # 可选，任务名称
     face_num=None,                                # 可选，目标面数（0~30000，0=使用默认值），不传自动配置
+    model_size=None,                              # 可选，期望生成的模型尺寸（cm，仅中模生效，默认 100.0，须大于 0）
     segment_model_id=None,                        # 可选，2D 分割资产 ID（仅中模有效），用于基于2D分割结果生成
     model_id_360=None,                             # 可选，图生360资产 ID，用于基于图生360结果生成
     group_ids=None,                                # 可选，自定义部件分组 NPZ 文件

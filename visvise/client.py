@@ -896,6 +896,7 @@ class VisviseClient:
         *,
         rtx: str,
         face_num: Optional[int] = None,
+        model_size: Optional[float] = None,
         skip_360_preprocess: Optional[bool] = None,
         segment_model_id: Optional[str] = None,
         model_id_360: Optional[str] = None,
@@ -920,6 +921,8 @@ class VisviseClient:
             face_type: 面数类型，默认 1。
             name: 任务名称。
             face_num: 目标面数，范围 0~30000（0=使用默认值），不传自动配置。
+            model_size: 期望生成的模型尺寸，单位 cm，可选。仅图生中模（node_type=11）生效，
+                不传则由算法默认 100.0，取值必须大于 0。
             skip_360_preprocess: 是否跳过图生360前置处理，默认 False（不跳过）。
                 注意：与自定义 Mask 参数（group_ids 等）互斥，同时使用会被服务端拒绝。
             segment_model_id: 2D 分割资产 ID，传入后将基于分割结果生成模型。
@@ -953,6 +956,8 @@ class VisviseClient:
         }
         if face_num is not None:
             img_params["face_num"] = face_num
+        if model_size is not None:
+            img_params["model_size"] = model_size
         if skip_360_preprocess is not None:
             img_params["skip_360_preprocess"] = skip_360_preprocess
         if segment_model_id is not None:

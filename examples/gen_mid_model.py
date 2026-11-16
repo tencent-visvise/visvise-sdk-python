@@ -54,6 +54,7 @@ def main():
         output_model_format=OutputModelFormat.FBX,
         face_type=FaceType.TRIANGLE,
         face_num=30000,  # 目标面数，0~30000，0=默认
+        model_size=100.0,  # 期望生成的模型尺寸（cm），仅中模生效，须大于 0
         name="example_gen_mid_model",
         rtx=RTX,
     )

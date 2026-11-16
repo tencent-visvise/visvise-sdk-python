@@ -283,6 +283,7 @@ model_id = client.gen_mid_model(
     face_type=FaceType.TRIANGLE,                  # optional, face type
     name="gen_mid_model",                         # optional, task name
     face_num=None,                                # optional, target face count (0-30000, 0 = default), auto if omitted
+    model_size=None,                              # optional, expected model size in cm (mid-poly only, default 100.0, must be > 0)
     segment_model_id=None,                        # optional, 2D segmentation asset ID (mid-poly only), generate from 2D segmentation result
     model_id_360=None,                            # optional, gen_360 asset ID, generate from gen_360 result
     group_ids=None,                               # optional, custom part-group NPZ file
