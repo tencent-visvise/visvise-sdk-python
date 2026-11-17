@@ -898,6 +898,7 @@ class VisviseClient:
         face_num: Optional[int] = None,
         model_size: Optional[float] = None,
         skip_360_preprocess: Optional[bool] = None,
+        skip_remove_background: Optional[bool] = None,
         segment_model_id: Optional[str] = None,
         model_id_360: Optional[str] = None,
         component_label: Optional[int] = None,
@@ -960,6 +961,8 @@ class VisviseClient:
             img_params["model_size"] = model_size
         if skip_360_preprocess is not None:
             img_params["skip_360_preprocess"] = skip_360_preprocess
+        if skip_remove_background is not None:
+            img_params["skip_remove_background"] = skip_remove_background
         if segment_model_id is not None:
             img_params["segment_model_id"] = segment_model_id
         if model_id_360 is not None:
