@@ -162,6 +162,12 @@ def _gen_random_filename(suffix: str = ".bin") -> str:
     return f"{uuid.uuid4().hex}{suffix}"
 
 
+def _append_upload_uuid(filename: str) -> str:
+    """在上传文件名的扩展名前追加 24 字符 UUID，避免同名对象覆盖。"""
+    stem, ext = os.path.splitext(filename)
+    return f"{stem}_{uuid.uuid4().hex[:24]}{ext}"
+
+
 def _gen_random_filename_for(data: bytes, default_ext: str = ".bin") -> str:
     """根据二进制内容自动嗅探扩展名后生成唯一文件名。
 
@@ -243,7 +249,7 @@ class VisviseClient:
         rtx: str,
         filename: Optional[str] = None,
         is_temp: bool = False,
-        randomize_name: bool = False,
+        randomize_name: bool = True,
     ) -> str:
         """将文件输入统一解析并上传到 COS，返回 VISVISE 平台 COS URL。
 
@@ -260,11 +266,11 @@ class VisviseClient:
         Args:
             source: 文件输入，支持本地路径 / bytes / BinaryIO。
             rtx: 实际使用人的 RTX，用于调用 get_cos_cred 接口。
-            filename: 内部使用的文件名（含扩展名）。bytes/BinaryIO 输入时若不传则自动用 uuid 生成。
+            filename: 内部使用的文件名（含扩展名），上传时会在扩展名前追加 uuid。
+                bytes/BinaryIO 输入时若不传则嗅探格式后自动用 uuid 生成。
             is_temp: 是否临时文件（7天后自动删除）。
-            randomize_name: 本地路径上传时是否重命名为「原文件名 + uuid + 扩展名」，
-                用于避免同名文件互相覆盖。默认 False（沿用原始文件名）。
-                bytes/BinaryIO 输入本就使用 uuid 命名，此参数不生效。
+            randomize_name: 为兼容旧调用保留；所有实际上传均使用 UUID 命名，
+                传入 False 也不再沿用固定文件名。
 
         Returns:
             上传后的 VISVISE 平台 COS URL，或原始 URL 字符串（如果 source 本身已是 URL）。
@@ -303,12 +309,7 @@ class VisviseClient:
         path_prefix = cred.path_prefix.rstrip("/") + "/"
         if isinstance(source, str):
             # 本地路径
-            if randomize_name and not filename:
-                stem, ext = os.path.splitext(os.path.basename(source))
-                ext = ext or ".bin"
-                _filename = f"{stem}_{uuid.uuid4().hex}{ext}"
-            else:
-                _filename = filename or os.path.basename(source)
+            _filename = _append_upload_uuid(filename or os.path.basename(source))
             cos_key = f"{path_prefix}{_filename}"
             logger.info("上传文件 %s → cos://%s/%s", source, cred.bucket, cos_key)
             with open(source, "rb") as f:
@@ -317,7 +318,7 @@ class VisviseClient:
         elif isinstance(source, (bytes, bytearray)):
             # 二进制内容：未指定 filename 则嗅探格式后用 uuid 生成
             data_bytes = bytes(source)
-            _filename = filename or _gen_random_filename_for(data_bytes, default_ext=".bin")
+            _filename = _append_upload_uuid(filename) if filename else f"{uuid.uuid4().hex[:24]}{_sniff_extension(data_bytes)}"
             cos_key = f"{path_prefix}{_filename}"
             logger.info("上传 bytes (%d bytes) → cos://%s/%s", len(data_bytes), cred.bucket, cos_key)
             cos_client.put_object(Bucket=cred.bucket, Body=data_bytes, Key=cos_key)
@@ -325,7 +326,7 @@ class VisviseClient:
         else:
             # 文件对象 (BinaryIO / BytesIO)：未指定 filename 则嗅探格式后用 uuid 生成
             data = source.read()
-            _filename = filename or _gen_random_filename_for(data, default_ext=".bin")
+            _filename = _append_upload_uuid(filename) if filename else f"{uuid.uuid4().hex[:24]}{_sniff_extension(data)}"
             cos_key = f"{path_prefix}{_filename}"
             logger.info("上传文件对象 (%d bytes) → cos://%s/%s", len(data), cred.bucket, cos_key)
             cos_client.put_object(Bucket=cred.bucket, Body=data, Key=cos_key)
@@ -935,16 +936,16 @@ class VisviseClient:
         view = View(main_view="")
         if model_id_360 is None and segment_model_id is None:
             # Resolve main view (required)
-            view.main_view = self._resolve_file(main_view, rtx=rtx, randomize_name=True)
+            view.main_view = self._resolve_file(main_view, rtx=rtx)
             # Resolve back view
             if back_view is not None:
-                view.back_view = self._resolve_file(back_view, rtx=rtx, randomize_name=True)
+                view.back_view = self._resolve_file(back_view, rtx=rtx)
             # Resolve left view
             if left_view is not None:
-                view.left_view = self._resolve_file(left_view, rtx=rtx, randomize_name=True)
+                view.left_view = self._resolve_file(left_view, rtx=rtx)
             # Resolve right view
             if right_view is not None:
-                view.right_view = self._resolve_file(right_view, rtx=rtx, randomize_name=True)
+                view.right_view = self._resolve_file(right_view, rtx=rtx)
         resolved_model = self._resolve_algorithm_model(algorithm_model, NodeType.IMG_TO_3D_MID, rtx=rtx)
         img_params: dict = {
             "algorithm_model": resolved_model,
@@ -965,19 +966,19 @@ class VisviseClient:
             img_params["group_ids"] = self._resolve_file(
                 group_ids,
                 rtx=rtx,
-                filename=_gen_random_filename(".npz"),
+                filename="group_ids.npz",
             )
         if part_mesh_path is not None:
             img_params["part_mesh_path"] = self._resolve_file(
                 part_mesh_path,
                 rtx=rtx,
-                filename=_gen_random_filename(".obj"),
+                filename="part_mesh.obj",
             )
         if label_to_id is not None:
             img_params["label_to_id"] = self._resolve_file(
                 label_to_id,
                 rtx=rtx,
-                filename=_gen_random_filename(".json"),
+                filename="label_to_id.json",
             )
         return self.api.gen_3d_model(
             name=name,
