@@ -55,4 +55,7 @@ python gen_segment_2d.py
 # Two ways to get the 2D segmentation output zip_path (uploads local six views, skips 360 and
 # background removal; point SEG_ASSETS_DIR at your assets directory)
 python gen_segment_2d_zip.py
+
+# Image cutout (synchronous endpoint; the example raises the client timeout to 300s)
+python image_cutout.py
 ```

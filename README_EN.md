@@ -36,6 +36,7 @@ Python SDK for the VISVISE Weaver OpenAPI. It provides:
   - [cond_part_autofit — Nude Model Split](#cond_part_autofit--nude-model-split)
   - [model_auto_merge — Model Auto Merge](#model_auto_merge--model-auto-merge)
   - [wait_model — Wait for Completion](#wait_model--wait-for-completion)
+  - [image_cutout — Image Cutout](#image_cutout--image-cutout)
 - [Atomic API Methods](#atomic-api-methods)
 - [Exceptions](#exceptions)
 - [Full Workflow Examples](#full-workflow-examples)
@@ -47,13 +48,13 @@ Python SDK for the VISVISE Weaver OpenAPI. It provides:
 Install directly from the GitHub repository (Tencent Cloud COS dependency included):
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.1.1
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.2.2
 ```
 
 Or via SSH:
 
 ```bash
-pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.1.1
+pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.2.2
 ```
 
 > **Note:** The Tencent Cloud COS SDK is bundled by default; local file auto-upload works out of the box.
@@ -134,6 +135,7 @@ from visvise import (
     FaceType, DetailLevel, OutputModelFormat, MeshRefineMode,
     SegmentSplitType, ImageGen360Style,
     NodeType, PreprocessType, StyleParam, StyleType,
+    ImageCutoutMode,
 )
 
 # Face type
@@ -174,6 +176,11 @@ StyleType.GRAYSCALE          # 1 - grayscale
 StyleType.PIXEL              # 2 - pixel art
 StyleType.REALISTIC          # 3 - realistic
 StyleType.CARTOON            # 4 - cartoon figurine
+
+# Image cutout mode
+ImageCutoutMode.DIRECT        # 1 - direct cutout (transparent background, default)
+ImageCutoutMode.SOLID_COLOR   # 2 - cutout with solid-color background
+ImageCutoutMode.REPLACE       # 3 - cutout and replace the background
 ```
 
 ---
@@ -306,6 +313,7 @@ model_id = client.gen_low_model(
     output_model_format=OutputModelFormat.FBX,    # optional, output format
     face_type=FaceType.TRIANGLE,                  # optional, face type
     name="gen_low_model",                          # optional, task name
+    face_num=None,                                 # optional, target face count (100~60000); auto if omitted
     back_view=None,                                # optional, back view
     left_view=None,                                # optional, left view
     right_view=None,                               # optional, right view,
@@ -671,6 +679,40 @@ print(model_info.time_cost)      # elapsed seconds
 
 ---
 
+### image_cutout — Image Cutout
+
+Removes the background of the given images. Three modes are supported: **direct cutout**,
+**cutout with a solid-color background**, and **cutout with a replaced background**.
+This is a synchronous endpoint: it only returns the processed images and **creates no model asset**.
+→ [Example code](examples/image_cutout.py)
+
+```python
+# Cutout is synchronous and may take minutes on the server — raise the client timeout
+client = VisviseClient(app_id="...", secret_key="...", timeout=300)
+
+result = client.image_cutout(
+    images=[                              # required, images to process (local path / VISVISE COS URL / bytes / BinaryIO)
+        "path/to/character.png",
+        "path/to/character_2.png",
+    ],
+    mode=ImageCutoutMode.DIRECT,           # optional, default 1 (direct cutout, transparent background)
+    background_color="white",              # optional, background color name, default "white"
+    rtx="caller_rtx",
+)
+
+print(result.image_list)         # processed image URLs (temporary signature, valid for 24h)
+print(result.background_color)   # final background color
+```
+
+> **Notes:**
+> 1. Input images must live in the caller's own COS directory; local paths / bytes are uploaded
+>    to the current account directory by the SDK.
+> 2. This is a synchronous endpoint — set the client `timeout` to at least 300 seconds
+>    (the default 30s will time out).
+> 3. Result URLs carry a temporary signature valid for 24h; keep the query string intact.
+
+---
+
 ## Atomic API Methods
 
 Access low-level endpoints via `client.api.xxx(rtx="caller_rtx")`:
@@ -704,6 +746,16 @@ client.api.batch_delete_model(["Model2026...", "Model2026..."], rtx="caller_rtx"
 
 # Remove background
 out_url = client.api.remove_bg("https://cos.../image.png", rtx="caller_rtx")
+
+# Image cutout (atomic API, image_list must be VISVISE COS URLs already uploaded)
+cutout = client.api.image_cutout(
+    ["https://cos.../image.png"],
+    ImageCutoutMode.DIRECT,     # 1 direct cutout / 2 solid-color background / 3 replace background
+    "white",                    # background color name
+    rtx="caller_rtx",
+)
+print(cutout.image_list)        # processed image URLs
+print(cutout.background_color)  # final background color
 
 # Text-to-motion prompt suggestions
 prompts = client.api.get_text2motion_prompt_list(language="en", rtx="caller_rtx")

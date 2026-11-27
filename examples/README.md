@@ -56,4 +56,7 @@ python gen_segment_2d.py
 
 # 2D拆分产物 zip_path 的两种获取方式（上传本地六视图，跳过360与去背景；素材目录用 SEG_ASSETS_DIR 指定）
 python gen_segment_2d_zip.py
+
+# 图片抠图（同步接口，示例内已把客户端 timeout 放大到 300 秒）
+python image_cutout.py
 ```
