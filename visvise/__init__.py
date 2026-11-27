@@ -11,7 +11,7 @@ Usage::
     print(model.output_model)
 """
 
-from .client import FileInput, VisviseClient
+from .client import VisviseClient
 from .http import Environment
 from .exceptions import (
     ModelGenerationError,
@@ -28,11 +28,15 @@ from .models import (
     CondPartAutofitResult,
     DetailLevel,
     FaceType,
+    FileInput,
     FramingAIOutput,
     GetCosCredResult,
     ImageCutoutMode,
     ImageCutoutResult,
+    ImageGen360ExtraReference,
     ImageGen360Output,
+    ImageGen360Revision,
+    ImageGen360RevisionViews,
     ImageGen360Style,
     MeshRefineMode,
     ModelAutoMergeResult,
@@ -41,6 +45,7 @@ from .models import (
     MotionSegment,
     NodeType,
     OutputModelFormat,
+    SaveRTPConnectedResult,
     SegmentOutput,
     SegmentViewData,
     SegmentComponent,
@@ -57,7 +62,7 @@ from .models import (
     View,
 )
 
-__version__ = "1.2.2"
+__version__ = "1.2.4"
 __all__ = [
     "VisviseClient",
     "FileInput",
@@ -106,4 +111,10 @@ __all__ = [
     # 裸模拆分 / 模型自动合并
     "CondPartAutofitResult",
     "ModelAutoMergeResult",
+    # 图生360 可选参数
+    "ImageGen360ExtraReference",
+    "ImageGen360Revision",
+    "ImageGen360RevisionViews",
+    # 重拓扑-连通体
+    "SaveRTPConnectedResult",
 ]

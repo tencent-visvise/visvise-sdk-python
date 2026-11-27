@@ -24,6 +24,7 @@ VISVISE Weaver OpenAPI 的 Python SDK，提供：
   - [gen_low_model — 图生低模](#gen_low_model--图生低模)
   - [gen_mesh_refine — 重布线](#gen_mesh_refine--重布线)
   - [gen_retopology — 重拓扑](#gen_retopology--重拓扑)
+  - [gen_rtp_connected— 重拓扑-连通体](#gen_rtp_connected-重拓扑-连通体)
   - [gen_lod — LOD](#gen_lod--lod)
   - [gen_uv — UV展开](#gen_uv--uv展开)
   - [gen_texture — 贴图纹理](#gen_texture--贴图纹理)
@@ -48,13 +49,13 @@ VISVISE Weaver OpenAPI 的 Python SDK，提供：
 直接从 GitHub 仓库安装（包含 COS 上传依赖）：
 
 ```bash
-pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.2.2
+pip install git+https://github.com/tencent-visvise/visvise-sdk-python.git@v1.2.4
 ```
 
 或通过 SSH：
 
 ```bash
-pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.2.2
+pip install git+ssh://git@github.com/tencent-visvise/visvise-sdk-python.git@v1.2.4
 ```
 
 > **注：** 安装后即包含腾讯云 COS SDK，可直接使用本地文件自动上传功能，无需额外安装。
@@ -220,13 +221,44 @@ model_id = client.gen_360(
     algorithm_model=None,                # 可选，算法模型名（如 "hunyuan3D-MultiView-v3.0"）；不传则自动选首个可用模型
     name="gen_360",                      # 可选，任务名称
     enable_a_pose=None,                  # 可选，是否开启 A-Pose（True/False）
+    prompt=None,                         # 可选，文本提示词
     style=None,                          # 可选，风格类型（仅 VISVISE 自研模型支持），只接受 ImageGen360Style 枚举：GRAY_MODEL/PHOTOREAL/Q_TOON/PIXEL，传其他值会报错
+    enable_head_refinement=None,         # 可选，是否开启脸部增强
+    aspect_ratio=None,                   # 可选，画面比例，如 "1:1"
+    enable_background_removal=None,      # 可选，是否开启去背景
+    seed=None,                           # 可选，随机种子（不传由算法随机生成）
+    enable_15deg=None,                   # 可选，是否矫正透视
+    extra_references=None,               # 可选，参考图列表（ImageGen360ExtraReference），图片自动上传 COS
+    revision=None,                       # 可选，续改参数（ImageGen360Revision），视图自动上传 COS
     back_view=None,                      # 可选，背视图，提升生成质量
     left_view=None,                      # 可选，左视图
     right_view=None,                     # 可选，右视图,
     rtx="caller_rtx",
 )
 ```
+
+> 可选参数与后端 `ImageGen360Params` 一一对应，SDK 不做参数校验，取值合法性由服务端校验。
+>
+> **参考图与续改参数**：
+>
+> ```python
+> from visvise import ImageGen360ExtraReference, ImageGen360Revision, ImageGen360RevisionViews
+>
+> model_id = client.gen_360(
+>     main_view="character.png",
+>     extra_references=[
+>         ImageGen360ExtraReference(path="ref.png", prompt="参考图说明"),
+>     ],
+>     revision=ImageGen360Revision(
+>         caption="上一次返回的 caption 全文（原样回传）",
+>         prompt="本次修改指令",
+>         views=ImageGen360RevisionViews(main_view="m.png", back_view="b.png"),
+>     ),
+>     rtx="caller_rtx",
+> )
+> ```
+>
+> `revision.views` 支持四视图（主 / 背 / 左 / 右），为空则该视图不下发。
 
 ---
 
@@ -346,8 +378,11 @@ model_id = client.gen_mesh_refine(
 对高面数模型进行拓扑优化（node_type=1）。 → [示例代码](examples/gen_retopology.py)
 
 > 注意：混元模型传 `detail_level`，VISVISE 自研模型传 `face_num`，二选一。
+>
+> VISVISE 自研（VV）模型为**两段式**：需先执行 [重拓扑-连通体](#gen_rtp_connected-重拓扑-连通体) 生成连通体分组产物，前端编辑并保存后，以保存得到的连通体资产 ID 作为 `parent_model_id` 发起本节点。
 
 ```python
+# 混元模型示例
 model_id = client.gen_retopology(
     model_path="path/to/model.fbx",               # 必填，输入模型
     algorithm_model=None,                          # 可选，如 "hunyuan3D-RTP-v1.5" / "VISVISE-RTP-V1.0.0"
@@ -355,10 +390,67 @@ model_id = client.gen_retopology(
     face_type=FaceType.QUAD,                      # 可选，面数类型（默认四边面）
     name="gen_retopology",                         # 可选，任务名称
     detail_level=DetailLevel.HIGH,                # 可选，混元模型必传：DetailLevel.LOW/MEDIUM/HIGH
-    face_num=None,                                 # 可选，VISVISE 自研模型必传：指定输出面数,
+    face_num=None,                                 # 可选，VISVISE 自研模型必传：指定输出面数
+    smooth_strength=None,                          # 可选，平滑强度：0.0（不平滑）/ 1.0（完全平滑），默认 1.0
+    parent_model_id=None,                          # 可选，VV 自研两段式必传：指向第一段保存后的连通体资产 ID
+    rtx="caller_rtx",
+)
+
+# VISVISE 自研模型示例（两段式：parent_model_id 指向第一段保存后的连通体资产）
+model_id = client.gen_retopology(
+    model_path="path/to/edited_connected.zip",
+    algorithm_model="VV-RTP-V1.5.0",
+    face_num=10000,                                 # 可选，VISVISE 自研模型
+    smooth_strength=1.0,
+    parent_model_id="Model2026112700098765",        # 可选，VV 自研两段式必传
     rtx="caller_rtx",
 )
 ```
+
+---
+
+### gen_rtp_connected— 重拓扑-连通体
+
+VISVISE 自研（VV）两段式重拓扑的第一段：对高面数模型做连通体分组（node_type=19），产出连通体网格与分组数据。 → [示例代码](examples/gen_rtp_connected.py)
+
+调用链路：
+
+1. `gen_rtp_connected` 创建连通体分组任务（异步），产物在资产的 `output_model`（zip）中；
+2. 前端下载并编辑连通体分组，重新打包成 zip 上传到当前账号的 COS 目录；
+3. `save_rtp_connected` 保存该产物（**同步接口**），返回新的连通体资产 ID（`node_type=19`，`status=3`）；
+4. 以该 ID 作为 `gen_retopology` 的 `parent_model_id` 发起第二段重拓扑。
+
+```python
+# 第一段：创建重拓扑-连通体任务
+connected_id = client.gen_rtp_connected(
+    model_path="path/to/model.fbx",     # 必填，输入模型（裸模型 SDK 自动打 zip）
+    algorithm_model=None,               # 可选，算法模型；不传则自动选首个可用模型
+    name="my_rtp_connected",             # 可选，任务名称
+    rtx="caller_rtx",
+)
+
+# 等待完成，下载 output_model（连通体分组产物 zip）并在前端编辑
+connected = client.wait_model(connected_id, timeout=900, rtx="caller_rtx")
+
+# 保存前端编辑后的产物（本地 zip 会自动上传到当前账号的 COS 目录）
+saved_id = client.save_rtp_connected(
+    connected_id,                        # 必填，第一段（连通体分组）资产 ID
+    "path/to/edited_connected.zip",      # 必填，连通体产物 zip（本地路径 / COS URL / bytes）
+    "my_connected",                      # 必填，新资产名称
+    rtx="caller_rtx",
+)
+
+# 第二段：重拓扑（parent_model_id 指向保存后的连通体资产）
+rtp_id = client.gen_retopology(
+    "path/to/edited_connected.zip",
+    algorithm_model="VV-RTP-V1.5.0",
+    face_num=10000,
+    parent_model_id=saved_id,
+    rtx="caller_rtx",
+)
+```
+
+> 参数校验（`model_id` 归属与状态、`output_model` 必须为 `.zip` 且位于本账号 COS 目录等）全部由服务端完成，SDK 只做参数透传与文件上传。
 
 ---
 
@@ -779,6 +871,15 @@ merged = client.api.model_auto_merge(
     rtx="caller_rtx",
 )
 print(merged.mean_bbox_iou)
+
+# 保存重拓扑-连通体产物（同步接口）
+result = client.api.save_rtp_connected(
+    "Model2026...",                       # 第一段（连通体分组）资产 ID
+    "https://cos.../edited_connected.zip",  # 连通体产物 zip（需在调用账号自己的 COS 目录下）
+    "my_connected",                        # 新资产名称
+    rtx="caller_rtx",
+)
+print(result.model_id)  # 新建的连通体资产 ID（node_type=19）
 ```
 
 ---

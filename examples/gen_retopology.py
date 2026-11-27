@@ -43,5 +43,24 @@ def main():
     print(f"  output_model : {model.output_model}")
 
 
+# VISVISE 自研（VV）模型为两段式：先用 gen_rtp_connected 生成连通体分组产物，
+# 前端编辑并通过 save_rtp_connected 保存后，以保存得到的 model_id 作为 parent_model_id：
+#
+#   connected_id = client.gen_rtp_connected(str(ASSETS / "high_model.fbx"), rtx=RTX)
+#   saved_id = client.save_rtp_connected(connected_id, "edited_connected.zip",
+#                                       "example_rtp_connected_saved", rtx=RTX)
+#   model_id = client.gen_retopology(
+#       "edited_connected.zip",
+#       algorithm_model="VV-RTP-V1.5.0",
+#       face_num=10000,             # VISVISE 自研模型用 face_num
+#       smooth_strength=1.0,        # 平滑强度
+#       parent_model_id=saved_id,   # 第一段保存后的连通体资产 ID
+#       name="example_gen_retopology_vv",
+#       rtx=RTX,
+#   )
+#
+# 完整示例见 gen_rtp_connected.py
+
+
 if __name__ == "__main__":
     main()

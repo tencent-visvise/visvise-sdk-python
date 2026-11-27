@@ -20,6 +20,7 @@ from .models import (
     ImageGen360Output,
     ModelAutoMergeResult,
     ModelInfo,
+    SaveRTPConnectedResult,
     UserQuota,
     View,
     RemovePatternParam,
@@ -108,6 +109,7 @@ class VisviseAPI:
         input_model: Optional[str] = None,
         input_model_format: Optional[str] = None,
         input_video: Optional[str] = None,
+        parent_model_id: Optional[str] = None,
     ) -> list[str]:
         """创建 3D 生成任务（异步）。
 
@@ -120,6 +122,8 @@ class VisviseAPI:
             input_model: 模型 COS 地址（zip 文件）。
             input_model_format: 模型格式 fbx/obj/glb。
             input_video: 视频 COS 地址（视频生动画必传）。
+            parent_model_id: 父模型资产 ID（可选）。两段式自研（VV）重拓扑时指向
+                第一段「重拓扑-连通体」资产（``node_type=19``）的 model_id。
 
         Returns:
             新生成的模型 ID 列表。
@@ -140,6 +144,8 @@ class VisviseAPI:
             body["input_model_format"] = input_model_format
         if input_video is not None:
             body["input_video"] = input_video
+        if parent_model_id is not None:
+            body["parent_model_id"] = parent_model_id
 
         data = self._http.post("openapi/weaver/resource/gen_3d_model", body, rtx=rtx)
         return data["model_ids"]
@@ -353,6 +359,47 @@ class VisviseAPI:
         if params is not None:
             body["params"] = params
         self._http.post("openapi/weaver/resource/regenerate_model", body, rtx=rtx)
+
+    # ──────────────────────────────────────────────────────────────────────
+    # 2.10c 保存重拓扑-连通体产物
+    # ──────────────────────────────────────────────────────────────────────
+
+    def save_rtp_connected(
+        self,
+        model_id: str,
+        output_model: str,
+        name: str,
+        *,
+        rtx: str,
+    ) -> SaveRTPConnectedResult:
+        """保存前端编辑后的连通体产物为新的 rtp-连通体资产（``node_type=19``）。
+
+        同步接口：调用成功后即创建一个生成成功（``status=3``）的模型资产，
+        并返回新的 model_id，无需轮询。
+
+        Args:
+            model_id: 第一段（连通体分组）资产 ID。
+            output_model: 连通体产物 zip 包的 COS 地址（需位于调用账号自己的 COS 目录下）。
+            name: 新资产名称。
+            rtx: 实际使用人的 RTX。**必填**。
+
+        Returns:
+            :class:`~visvise.models.SaveRTPConnectedResult`
+
+        Raises:
+            WeaverError / 子类: 接口错误
+        """
+        body: dict = {
+            "model_id": model_id,
+            "output_model": output_model,
+            "name": name,
+        }
+        data = self._http.post(
+            "openapi/weaver/resource/save_rtp_connected",
+            body,
+            rtx=rtx,
+        )
+        return SaveRTPConnectedResult.from_dict(data or {})
 
     # ──────────────────────────────────────────────────────────────────────
     # 2.11 去除图片背景

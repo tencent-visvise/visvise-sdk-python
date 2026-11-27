@@ -33,11 +33,29 @@ def main():
 
     model_id = client.gen_360(
         main_view=str(MAIN_VIEW),
-        algorithm_model="VISVISE-MultiView-V1.0.0",
         name="example_gen_360",
         rtx=RTX,
     )
     print(f"[gen_360] 任务已创建，model_id={model_id}")
+
+    # gen_360 还支持以下可选参数（与后端 ImageGen360Params 一一对应）：
+    #
+    #   prompt="一个穿着盔甲的骑士",          # 文本提示词
+    #   enable_head_refinement=True,          # 脸部增强
+    #   aspect_ratio="1:1",                   # 画面比例
+    #   enable_background_removal=True,       # 去背景
+    #   seed=1234,                            # 随机种子
+    #   enable_15deg=True,                    # 矫正透视
+    #   style=ImageGen360Style.GRAY_MODEL,    # 风格（仅 VISVISE 自研模型支持）
+    #   extra_references=[                    # 参考图（图片自动上传 COS）
+    #       ImageGen360ExtraReference(path=str(ASSETS / "main_view.png"), prompt="参考图说明"),
+    #   ],
+    #   revision=ImageGen360Revision(         # 续改参数（视图自动上传 COS）
+    #       caption="上一次返回的 caption 全文",
+    #       prompt="本次修改指令",
+    #       views=ImageGen360RevisionViews(main_view=str(MAIN_VIEW)),
+    #   ),
+    #   back_view=..., left_view=..., right_view=...,   # 额外视图
 
     print("[gen_360] 等待完成...")
     model = client.wait_model(model_id, interval=3, timeout=300, rtx=RTX)

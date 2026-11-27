@@ -51,6 +51,10 @@ python gen_high_model.py
 # 重拓扑
 python gen_retopology.py
 
+# 重拓扑-连通体（两段式自研重拓扑的第一段）
+# 设置 VISVISE_RTP_CONNECTED_ZIP 后会继续执行「保存产物 + 第二段重拓扑」
+python gen_rtp_connected.py
+
 # 2D拆分（需要先运行 gen_360.py 设置 MV_360_MODEL_ID）
 python gen_segment_2d.py
 

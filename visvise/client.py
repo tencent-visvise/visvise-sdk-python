@@ -16,16 +16,19 @@ import os
 import time
 import uuid
 import zipfile
-from typing import IO, Callable, Optional, Union
+from typing import Callable, Optional
 
 from .api import VisviseAPI
 from .exceptions import ModelGenerationError, PollingTimeoutError, WeaverError
 from .http import Environment, WeaverHTTPClient
 from .models import (
+    FileInput,
     CondPartAutofitResult,
     GetCosCredResult,
     ImageCutoutMode,
     ImageCutoutResult,
+    ImageGen360ExtraReference,
+    ImageGen360Revision,
     ImageGen360Style,
     ModelAutoMergeResult,
     MotionSegment,
@@ -43,9 +46,6 @@ from .models import (
 )
 
 logger = logging.getLogger("visvise.client")
-
-# 文件输入类型：本地路径字符串 / bytes 二进制内容 / 文件对象（BinaryIO）
-FileInput = Union[str, bytes, IO[bytes]]
 
 # 直接支持的模型格式（非 zip，需要自动打包）
 _MODEL_EXTENSIONS = {".fbx", ".obj", ".glb", ".gltf"}
@@ -613,6 +613,80 @@ class VisviseClient:
             time.sleep(interval)
 
     # ══════════════════════════════════════════════════════════════════════
+    # 图生360 辅助解析（参考图 / 续改参数）
+    # ══════════════════════════════════════════════════════════════════════
+
+    def _resolve_extra_references(
+        self,
+        refs: list[ImageGen360ExtraReference],
+        *,
+        rtx: str,
+    ) -> list[dict]:
+        """上传图生360的参考图，返回可直接下发给服务端的参数列表。
+
+        Args:
+            refs: 参考图列表，参考 :class:`~visvise.models.ImageGen360ExtraReference`。
+            rtx: 实际使用人的 RTX。
+
+        Returns:
+            ``[{"path": url, "prompt": str}, ...]``，``prompt`` 为空时不下发。
+
+        Raises:
+            ValueError: 某个参考图的 ``path`` 为空。
+            WeaverError / 子类: 上传失败。
+        """
+        result: list[dict] = []
+        for ref in refs:
+            if not ref.path:
+                raise ValueError("extra_references 中的 path 不能为空")
+            item: dict = {"path": self._resolve_file(ref.path, rtx=rtx)}
+            if ref.prompt:
+                item["prompt"] = ref.prompt
+            result.append(item)
+        return result
+
+    def _resolve_revision(
+        self,
+        revision: ImageGen360Revision,
+        *,
+        rtx: str,
+    ) -> dict:
+        """上传图生360续改参数中的视图，返回可直接下发给服务端的参数字典。
+
+        Args:
+            revision: 续改参数，参考 :class:`~visvise.models.ImageGen360Revision`。
+            rtx: 实际使用人的 RTX。
+
+        Returns:
+            ``{"caption": str, "prompt": str, "views": {...}}``，空字段不下发。
+        """
+        result: dict = {}
+        if revision.caption:
+            result["caption"] = revision.caption
+        if revision.prompt:
+            result["prompt"] = revision.prompt
+
+        views = revision.views
+        if views is None:
+            return result
+
+        fields = (
+            ("main_view", views.main_view),
+            ("back_view", views.back_view),
+            ("left_view", views.left_view),
+            ("right_view", views.right_view),
+        )
+        resolved_views: dict = {}
+        for key, value in fields:
+            # 同时过滤 None 和空字符串
+            if not value:
+                continue
+            resolved_views[key] = self._resolve_file(value, rtx=rtx)
+        if resolved_views:
+            result["views"] = resolved_views
+        return result
+
+    # ══════════════════════════════════════════════════════════════════════
     # 算法模型自动解析
     # ══════════════════════════════════════════════════════════════════════
 
@@ -756,12 +830,23 @@ class VisviseClient:
         *,
         rtx: str,
         enable_a_pose: Optional[bool] = None,
+        prompt: Optional[str] = None,
         style: Optional[str] = None,
+        enable_head_refinement: Optional[bool] = None,
+        aspect_ratio: Optional[str] = None,
+        enable_background_removal: Optional[bool] = None,
+        seed: Optional[int] = None,
+        enable_15deg: Optional[bool] = None,
+        extra_references: Optional[list[ImageGen360ExtraReference]] = None,
+        revision: Optional[ImageGen360Revision] = None,
         back_view: Optional[FileInput] = None,
         left_view: Optional[FileInput] = None,
         right_view: Optional[FileInput] = None,
     ) -> str:
         """图生360：从图片生成多视图。
+
+        可选参数与后端 ``ImageGen360Params`` 一一对应，SDK 不做参数校验，
+        取值合法性由服务端校验。
 
         Args:
             main_view: 主视图，支持本地路径、VISVISE 平台 COS URL 或 bytes/BinaryIO。
@@ -769,7 +854,9 @@ class VisviseClient:
             algorithm_model: 算法模型名称（如 ``hunyuan3D-MultiView-v3.0``）。
                 可选，若不传则自动获取当前账号可用的第一个模型。
             name: 任务名称。
+            rtx: 实际使用人的 RTX。**必填**。
             enable_a_pose: 是否开启 A-Pose。
+            prompt: 文本提示词。
             style: 风格类型（仅 VISVISE 自研模型支持）。**只接受固定枚举值**，
                 参考 :class:`~visvise.models.ImageGen360Style`：
 
@@ -779,13 +866,24 @@ class VisviseClient:
                 - ``ImageGen360Style.PIXEL``       ("像素风格")
 
                 传其它自定义值会被服务端拒绝；不传则不做风格转换。
+            enable_head_refinement: 是否开启脸部增强。
+            aspect_ratio: 画面比例，如 ``"1:1"``。
+            enable_background_removal: 是否开启去背景。
+            seed: 随机种子（不传则由算法随机生成）。
+            enable_15deg: 是否矫正透视。
+            extra_references: 参考图列表，参考
+                :class:`~visvise.models.ImageGen360ExtraReference`；
+                图片由 SDK 自动上传到当前账号的 COS 目录。
+            revision: 续改参数，参考 :class:`~visvise.models.ImageGen360Revision`；
+                ``caption`` 为上一次返回的 caption 全文（原样回传），
+                ``prompt`` 为本次修改指令，``views`` 为本次使用的四视图。
             back_view / left_view / right_view: 可选的额外视图，同样支持三种输入形式。
 
         Returns:
             新生成的模型 ID。
 
         Raises:
-            ValueError: ``style`` 不在允许列表内。
+            ValueError: ``style`` 不在允许列表内，或 ``extra_references`` 中 ``path`` 为空。
             WeaverError / 子类
         """
         if style is not None and style not in ImageGen360Style.values():
@@ -803,8 +901,24 @@ class VisviseClient:
         img360: dict = {"algorithm_model": resolved_model}
         if enable_a_pose is not None:
             img360["enable_a_pose"] = enable_a_pose
+        if prompt:
+            img360["prompt"] = prompt
         if style:
             img360["style"] = style
+        if enable_head_refinement is not None:
+            img360["enable_head_refinement"] = enable_head_refinement
+        if aspect_ratio:
+            img360["aspect_ratio"] = aspect_ratio
+        if enable_background_removal is not None:
+            img360["enable_background_removal"] = enable_background_removal
+        if seed is not None:
+            img360["seed"] = seed
+        if enable_15deg is not None:
+            img360["enable_15deg"] = enable_15deg
+        if extra_references:
+            img360["extra_references"] = self._resolve_extra_references(extra_references, rtx=rtx)
+        if revision is not None:
+            img360["revision"] = self._resolve_revision(revision, rtx=rtx)
 
         return self.api.gen_multi_views(
             name=name,
@@ -948,7 +1062,7 @@ class VisviseClient:
                 view.back_view = self._resolve_file(back_view, rtx=rtx)
             # Resolve left view
             if left_view is not None:
-                view.left_view = self._resolve_file(left_view, rtx=rtx)
+                view.left_view = self._resolve_file(left_view, rtx=rtx, randomize_name=True)
             # Resolve right view
             if right_view is not None:
                 view.right_view = self._resolve_file(right_view, rtx=rtx)
@@ -1115,6 +1229,8 @@ class VisviseClient:
         rtx: str,
         detail_level: Optional[int] = None,
         face_num: Optional[int] = None,
+        smooth_strength: Optional[float] = None,
+        parent_model_id: Optional[str] = None,
     ) -> str:
         """重拓扑（node_type=1）。
 
@@ -1126,8 +1242,14 @@ class VisviseClient:
             output_model_format: 输出格式，默认 fbx。
             face_type: 面数类型 1:三角面 2:四边面，默认 2。
             name: 任务名称。
+            rtx: 实际使用人的 RTX。**必填**。
             detail_level: 精细程度 1/2/3（混元模型必传）。
             face_num: 指定面数（VISVISE 自研模型必传）。
+            smooth_strength: 平滑强度，当前只支持 ``0.0``（不平滑）/ ``1.0``（完全平滑），
+                不传默认 ``1.0``。
+            parent_model_id: 父模型资产 ID（可选）。两段式自研（VV）重拓扑时**必传**，
+                指向第一段「重拓扑-连通体」资产（``node_type=19``）的 model_id，
+                由 :meth:`save_rtp_connected` 返回。
 
         Note:
             ``detail_level`` 和 ``face_num`` 根据算法模型二选一。
@@ -1143,14 +1265,95 @@ class VisviseClient:
             params["detail_level"] = detail_level
         if face_num is not None:
             params["face_num"] = face_num
+        if smooth_strength is not None:
+            params["smooth_strength"] = smooth_strength
 
         return self.api.gen_3d_model(
             name=name,
             node_type=NodeType.RE_TOPOLOGY,
             params={"re_topology_params": params},
             input_model=cos_url,
+            parent_model_id=parent_model_id,
         rtx=rtx,
         )[0]
+
+    # ── 3.6.1 重拓扑-连通体 / 保存重拓扑-连通体 ────────────────────────────
+
+    def gen_rtp_connected(
+        self,
+        model_path: FileInput,
+        algorithm_model: Optional[str] = None,
+        name: str = "gen_rtp_connected",
+        *,
+        rtx: str,
+    ) -> str:
+        """重拓扑-连通体（node_type=19）。
+
+        VISVISE 自研（VV）两段式重拓扑的**第一段**：对高面数模型做连通体分组，
+        产出连通体网格与分组数据（产物在资产的 ``output_model`` zip 中）。
+
+        完整链路：
+
+        1. :meth:`gen_rtp_connected` 创建连通体分组任务（异步）；
+        2. :meth:`wait_model` 等待完成，下载 ``output_model``（连通体分组产物 zip）
+           并在前端编辑连通体分组；
+        3. 将编辑结果重新打包成 zip 上传到当前账号的 COS 目录；
+        4. :meth:`save_rtp_connected` 保存该产物，得到新的连通体资产 ID；
+        5. 以该 ID 作为 :meth:`gen_retopology` 的 ``parent_model_id`` 发起第二段重拓扑。
+
+        Args:
+            model_path: 输入模型，支持本地路径（.fbx/.obj/.glb/.zip）、VISVISE 平台
+                COS URL 或 bytes/BinaryIO。裸模型 SDK 自动打包成 zip。
+            algorithm_model: 算法模型名称；不传时自动选择当前账号可用的首个模型。
+            name: 任务名称。
+            rtx: 实际使用人的 RTX。**必填**。
+
+        Returns:
+            新生成的连通体资产 ID（node_type=19）。
+        """
+        cos_url = self._resolve_model_file(model_path, rtx=rtx)
+        resolved_model = self._resolve_algorithm_model(
+            algorithm_model, NodeType.RE_TOPOLOGY_CONNECTED, rtx=rtx
+        )
+        return self.api.gen_3d_model(
+            name=name,
+            node_type=NodeType.RE_TOPOLOGY_CONNECTED,
+            params={"algorithm_model": resolved_model},
+            input_model=cos_url,
+        rtx=rtx,
+        )[0]
+
+    def save_rtp_connected(
+        self,
+        model_id: str,
+        output_model: FileInput,
+        name: str,
+        *,
+        rtx: str,
+    ) -> str:
+        """保存重拓扑-连通体产物（``save_rtp_connected``）。
+
+        把前端编辑后的连通体产物保存为**新的** rtp-连通体资产（``node_type=19``）。
+        同步接口：调用成功后即创建一个生成成功（``status=3``）的模型资产并返回新的
+        model_id，**无需轮询**。
+
+        Args:
+            model_id: 第一段（连通体分组）资产 ID。
+            output_model: 连通体产物 zip 包，支持本地路径、VISVISE 平台 COS URL 或
+                bytes/BinaryIO；本地与二进制输入由 SDK 自动上传到当前账号的 COS 目录
+                （服务端要求该文件位于调用账号自己的 COS 目录下）。
+            name: 新资产名称。
+            rtx: 实际使用人的 RTX。**必填**。
+
+        Returns:
+            新建的连通体资产 ID，作为第二段重拓扑的 ``parent_model_id``。
+
+        Raises:
+            WeaverError / 子类: 上传或接口调用失败。
+        """
+        output_url = self._resolve_file(output_model, rtx=rtx)
+        result = self.api.save_rtp_connected(model_id, output_url, name, rtx=rtx)
+        return result.model_id
 
     # ── 3.7 LOD ──────────────────────────────────────────────────────────
 

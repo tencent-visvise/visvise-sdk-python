@@ -49,6 +49,10 @@ python gen_high_model.py
 # Retopology
 python gen_retopology.py
 
+# Retopology - connected component (stage 1 of the two-stage proprietary retopology)
+# Set VISVISE_RTP_CONNECTED_ZIP to also run "save artifact + stage 2 retopology"
+python gen_rtp_connected.py
+
 # 2D segmentation (run gen_360.py first and set MV_360_MODEL_ID)
 python gen_segment_2d.py
 

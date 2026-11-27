@@ -8,7 +8,11 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, IO, Optional, Union
+
+
+# 文件输入类型：本地路径字符串 / bytes 二进制内容 / 文件对象（BinaryIO）
+FileInput = Union[str, bytes, IO[bytes]]
 
 
 # ──────────────────────────────────────────────
@@ -33,6 +37,7 @@ class NodeType:
     SEGMENT_2D = 14       # 2D 拆分
     AUTO_LUV = 15         # 2UV（重生成 regenerate_model）
     PREPROCESS_2D = 16    # 2D 预处理
+    RE_TOPOLOGY_CONNECTED = 19  # 重拓扑-连通体（两段式自研重拓扑的第一段）
 
 
 class PreprocessType:
@@ -175,6 +180,46 @@ class RemovePatternParam:
 
 
 @dataclass
+class ImageGen360ExtraReference:
+    """图生 360 - 参考图。
+
+    Attributes:
+        path: 参考图文件，支持本地路径 / VISVISE 平台 COS URL / bytes / BinaryIO，
+            ``gen_360`` 会自动上传到当前账号的 COS 目录。
+        prompt: 参考图说明（可选）。
+    """
+    path: FileInput
+    prompt: str = ""
+
+
+@dataclass
+class ImageGen360RevisionViews:
+    """图生 360 - 续改参数中的视图（四视图：主 / 背 / 左 / 右）。
+
+    各视图支持本地路径 / VISVISE 平台 COS URL / bytes / BinaryIO，
+    ``gen_360`` 会自动上传到当前账号的 COS 目录；为空则该视图不下发。
+    """
+    main_view: Optional[FileInput] = None
+    back_view: Optional[FileInput] = None
+    left_view: Optional[FileInput] = None
+    right_view: Optional[FileInput] = None
+
+
+@dataclass
+class ImageGen360Revision:
+    """图生 360 - 续改参数。
+
+    Attributes:
+        caption: 上一次返回的 caption 全文（原样回传）。
+        prompt: 本次修改指令。
+        views: 本次续改使用的视图（四视图，可选）。
+    """
+    caption: str = ""
+    prompt: str = ""
+    views: Optional[ImageGen360RevisionViews] = None
+
+
+@dataclass
 class ReduceFace:
     """LOD 单级减面配置"""
     reduce_level: int
@@ -233,6 +278,23 @@ class MotionSegment:
 # 响应数据结构
 # ──────────────────────────────────────────────
 
+
+class _DictAccessMixin:
+    """让 dataclass 同时支持 ``obj["field"]`` 风格访问，兼容 API 文档示例写法。"""
+
+    def __getitem__(self, key: str) -> Any:
+        """按字段名取值，等价于 ``obj.field``；字段不存在时抛 KeyError。"""
+        if key in {f.name for f in dataclasses.fields(self)}:
+            return getattr(self, key)
+        raise KeyError(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """按字段名取值，字段不存在时返回 default。"""
+        if key in {f.name for f in dataclasses.fields(self)}:
+            return getattr(self, key)
+        return default
+
+
 @dataclass
 class CosCred:
     """COS 临时凭证"""
@@ -287,7 +349,7 @@ class UserQuota:
 
 
 @dataclass
-class ImageCutoutResult:
+class ImageCutoutResult(_DictAccessMixin):
     """image_cutout 接口响应（图片抠图结果）。"""
 
     image_list: list[str] = field(default_factory=list)
@@ -303,12 +365,21 @@ class ImageCutoutResult:
             background_color=d.get("background_color", ""),
         )
 
-    def __getitem__(self, key: str):
-        """__getitem__ 支持字典式取值，兼容接口文档示例 result["image_list"] 的写法。"""
-        try:
-            return getattr(self, key)
-        except AttributeError as e:
-            raise KeyError(key) from e
+
+@dataclass
+class SaveRTPConnectedResult(_DictAccessMixin):
+    """save_rtp_connected 接口响应（保存重拓扑-连通体产物）。
+
+    * ``model_id``：新建的 rtp-连通体资产 ID（node_type=19，status=3），
+      作为第二段「重拓扑」（node_type=1）的 parent_model_id 使用
+    """
+
+    model_id: str = ""
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "SaveRTPConnectedResult":
+        """from_dict 从接口响应字典构造 SaveRTPConnectedResult。"""
+        return cls(model_id=d.get("model_id", ""))
 
 
 @dataclass
@@ -404,9 +475,19 @@ class ImageGen360Output:
 
     @classmethod
     def from_dict(cls, d: dict) -> "ImageGen360Output":
+        """from_dict 从接口响应字典构造 ImageGen360Output。"""
         ov = d.get("output_view")
+        # 显式取 View 已知的 6 个字段，忽略服务端可能多返回的 front_* 等 key
+        output_view = View(
+            main_view=ov.get("main_view", ""),
+            back_view=ov.get("back_view", ""),
+            left_view=ov.get("left_view", ""),
+            right_view=ov.get("right_view", ""),
+            top_view=ov.get("top_view", ""),
+            bottom_view=ov.get("bottom_view", ""),
+        ) if ov else None
         return cls(
-            output_view=View(**{k: v for k, v in ov.items() if v}) if ov else None,
+            output_view=output_view,
             horizontal_view_video=d.get("horizontal_view_video", ""),
             vertical_view_video=d.get("vertical_view_video", ""),
             horizontal_view_video_frames=d.get("horizontal_view_video_frames", ""),
@@ -627,22 +708,6 @@ class ModelInfo:
 # ──────────────────────────────────────────────
 # 裸模拆分 / 模型自动合并（同步接口，不创建模型资产）
 # ──────────────────────────────────────────────
-
-
-class _DictAccessMixin:
-    """让 dataclass 同时支持 ``obj["field"]`` 风格访问，兼容 API 文档示例写法。"""
-
-    def __getitem__(self, key: str) -> Any:
-        """按字段名取值，等价于 ``obj.field``；字段不存在时抛 KeyError。"""
-        if key in {f.name for f in dataclasses.fields(self)}:
-            return getattr(self, key)
-        raise KeyError(key)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """按字段名取值，字段不存在时返回 default。"""
-        if key in {f.name for f in dataclasses.fields(self)}:
-            return getattr(self, key)
-        return default
 
 
 @dataclass
